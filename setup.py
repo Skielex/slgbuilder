@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(name="slgbuilder",
-      version="0.1.0",
+      version="0.1.1",
       author="Niels Jeppesen",
       author_email="niejep@dtu.dk",
       description="A Python package for building and cutting sparse layered s-t graphs.",
