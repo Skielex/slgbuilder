@@ -1,6 +1,9 @@
 # Python package for building and solving Sparse Layered Graphs
 This package allows building and solving [Sparse Layered Graphs](http://openaccess.thecvf.com/content_CVPR_2020/papers/Jeppesen_Sparse_Layered_Graphs_for_Multi-Object_Segmentation_CVPR_2020_paper.pdf) (SLG) using *s-t* graph cuts. The package itself is written purely in Python and contains logic for building graphs for both single- and multi-label problems. To perform the graph-cut the package relies on either the [```thinmaxflow```](https://github.com/Skielex/thinmaxflow), [```thinqpbo```](https://github.com/Skielex/thinqpbo) or [```ortools```](https://github.com/google/or-tools) package.
 
+## Installation
+Install package using ```pip install slgbuilder``` or clone the repository.
+
 ## What is it for?
 The package is primarily targeted multi-label/multi-object image segmentation problems. Common uses include:
 - Surface detection
@@ -25,7 +28,7 @@ The package currently supports three different.
 For submodular problems (e.g. segmentation without exclusion constriants), the default solver, used by the ```MaxflowBuilder``` is an [updated version](https://github.com/Skielex/maxflow) the Boykov-Kolmogorov Maxflow algorithm, accessed through the [```thinmaxflow```](https://github.com/Skielex/thinmaxflow) package.
 
 **QPBO**
-For non-submodular problems (e.g. segmentation with exclusion constriants) the solver used by the ```QPBOBuilder``` is [this version](https://github.com/Skielex/maxflow) of the QPBO algorithm, accessed through the [```thinqpbo```](https://github.com/Skielex/thinmaxflow) package.
+For non-submodular problems (e.g. segmentation with exclusion constriants) the solver used by the ```QPBOBuilder``` is [this version](https://github.com/Skielex/maxflow) of the QPBO algorithm, accessed through the [```thinqpbo```](https://github.com/Skielex/thinqpbo) package.
 
 **OR Tools**
 An alternative to the BK Maxflow solver is the [Google Maxflow](https://developers.google.com/optimization/flow/maxflow) implementation, which is a push-relabel algorithm. This can be done using the ```ORBuilder``` class. Apart from performance, the difference between the Google and BK Maxflow algorithms is that the Google implementation doesn't support floating type capacities. If ```MaxflowBuilder``` is slow when solving, try using the ```ORBuilder``` instead.
