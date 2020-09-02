@@ -99,7 +99,7 @@ class SLGBuilder(ABC):
         i, j, e00, e01, e10, e11 = i.ravel(), j.ravel(), e00.ravel(), e01.ravel(), e10.ravel(), e11.ravel()
         return i, j, e00, e01, e10, e11
 
-    def build_graph(self, pack_nodes=False):
+    def build_graph(self, pack_nodes=False, sort_pairwise_terms=False):
 
         if self.graph is not None:
             return
@@ -163,16 +163,17 @@ class SLGBuilder(ABC):
             self.pairwise_e10.clear()
             self.pairwise_e11.clear()
 
-            # Sort.
-            sort_indices = np.lexsort((-i, -j))
+            if sort_pairwise_terms:
+                # Sort.
+                sort_indices = np.lexsort((-i, -j))
 
-            # Sorted edges.
-            i = i[sort_indices]
-            j = j[sort_indices]
-            e00 = e00[sort_indices]
-            e01 = e01[sort_indices]
-            e10 = e10[sort_indices]
-            e11 = e11[sort_indices]
+                # Sorted edges.
+                i = i[sort_indices]
+                j = j[sort_indices]
+                e00 = e00[sort_indices]
+                e01 = e01[sort_indices]
+                e10 = e10[sort_indices]
+                e11 = e11[sort_indices]
 
             # GC before adding edges.
             gc.collect()
