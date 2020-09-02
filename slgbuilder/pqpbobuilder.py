@@ -1,5 +1,5 @@
 import numpy as np
-import thinpqpbo
+import shrdr
 
 from .graphobject import GraphObject
 from .slgbuilder import SLGBuilder
@@ -19,18 +19,12 @@ class PQPBOBuilder(SLGBuilder):
         if flow_type == np.int32:
             self.flow_type = np.int32
             self.inf_cap = self.INF_CAP_INT32
-        elif flow_type == np.float32:
-            self.flow_type = np.float32
-            self.inf_cap = self.INF_CAP_FLOAT32
-        elif flow_type == np.float64:
-            self.flow_type = np.float64
-            self.inf_cap = self.INF_CAP_FLOAT64
         else:
             raise ValueError("Invalid flow_type '%s'. Only 'int32', 'float32' and 'float64' allowed.")
 
     def create_graph_object(self):
         if self.flow_type == np.int32:
-            self.graph = thinpqpbo.ParallelQpboInt(self.estimated_nodes, self.estimated_edges, expect_nonsubmodular=True, expected_blocks=len(self.objects))
+            self.graph = shrdr.ParallelQpboInt(self.estimated_nodes, self.estimated_edges, expect_nonsubmodular=True, expected_blocks=len(self.objects))
         else:
             raise ValueError("Invalid flow_type '%s'. Only 'int32', 'float32' and 'float64' allowed.")
 
@@ -56,34 +50,46 @@ class PQPBOBuilder(SLGBuilder):
         return object_id
 
     def add_unary_terms(self, i, e0, e1):
-        if self.graph is None:
-            i, e0, e1 = np.broadcast_arrays(i, e0, e1)
+        i, e0, e1 = self.broadcast_unary_terms(i, e0, e1)
 
-            self.unary_nodes.append(i.flatten().astype(np.int32))
-            self.unary_e0.append(e0.flatten().astype(self.flow_type))
-            self.unary_e1.append(e1.flatten().astype(self.flow_type))
+        if self.graph is None:
+            self.unary_nodes.append(i)
+            self.unary_e0.append(e0)
+            self.unary_e1.append(e1)
         else:
-            np.vectorize(self.graph.add_unary_term, otypes=[np.bool])(i, e0, e1)
+            i = np.ascontiguousarray(i)
+            e0 = np.ascontiguousarray(e0)
+            e1 = np.ascontiguousarray(e1)
+            self.graph.add_unary_terms(i, e0, e1)
 
     def add_pairwise_terms(self, i, j, e00, e01, e10, e11):
-        if self.graph is None:
-            i, j, e00, e01, e10, e11 = np.broadcast_arrays(i, j, e00, e01, e10, e11)
+        i, j, e00, e01, e10, e11 = self.broadcast_pairwise_terms(i, j, e00, e01, e10, e11)
 
-            self.pairwise_from.append(i.flatten().astype(np.int32))
-            self.pairwise_to.append(j.flatten().astype(np.int32))
-            self.pairwise_e00.append(e00.flatten().astype(self.flow_type))
-            self.pairwise_e01.append(e01.flatten().astype(self.flow_type))
-            self.pairwise_e10.append(e10.flatten().astype(self.flow_type))
-            self.pairwise_e11.append(e11.flatten().astype(self.flow_type))
+        if self.graph is None:
+            self.pairwise_from.append(i)
+            self.pairwise_to.append(j)
+            self.pairwise_e00.append(e00)
+            self.pairwise_e01.append(e01)
+            self.pairwise_e10.append(e10)
+            self.pairwise_e11.append(e11)
         else:
-            return np.vectorize(self.graph.add_pairwise_term)(i, j, e00, e01, e10, e11)
+            i = np.ascontiguousarray(i)
+            j = np.ascontiguousarray(j)
+            e00 = np.ascontiguousarray(e00)
+            e01 = np.ascontiguousarray(e01)
+            e10 = np.ascontiguousarray(e10)
+            e11 = np.ascontiguousarray(e11)
+            self.graph.add_pairwise_terms(i, j, e00, e01, e10, e11)
 
     def get_labels(self, i):
         if isinstance(i, GraphObject):
             return self.get_labels(self.get_nodeids(i))
         return np.vectorize(self.graph.get_label, otypes=[np.int8])(i)
 
-    def solve(self):
+    def solve(self, compute_weak_persistencies=True):
         self.build_graph()
         self.graph.solve()
+        if compute_weak_persistencies:
+            self.graph.compute_weak_persistencies()
         return self.graph.compute_twice_energy()
+

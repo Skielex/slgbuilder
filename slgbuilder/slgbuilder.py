@@ -80,6 +80,25 @@ class SLGBuilder(ABC):
     def solve(self):
         pass
 
+    def broadcast_unary_terms(self, i, e0, e1):
+        i = np.asarray(i, dtype=np.uint32)
+        e0 = np.asarray(e0, dtype=self.flow_type)
+        e1 = np.asarray(e1, dtype=self.flow_type)
+        i, e0, e1 = np.broadcast_arrays(i, e0, e1)
+        i, e0, e1 = i.ravel(), e0.ravel(), e1.ravel()
+        return i, e0, e1
+
+    def broadcast_pairwise_terms(self, i, j, e00, e01, e10, e11):
+        i = np.asarray(i, dtype=np.uint32)
+        j = np.asarray(j, dtype=np.uint32)
+        e00 = np.asarray(e00, dtype=self.flow_type)
+        e01 = np.asarray(e01, dtype=self.flow_type)
+        e10 = np.asarray(e10, dtype=self.flow_type)
+        e11 = np.asarray(e11, dtype=self.flow_type)
+        i, j, e00, e01, e10, e11 = np.broadcast_arrays(i, j, e00, e01, e10, e11)
+        i, j, e00, e01, e10, e11 = i.ravel(), j.ravel(), e00.ravel(), e01.ravel(), e10.ravel(), e11.ravel()
+        return i, j, e00, e01, e10, e11
+
     def build_graph(self, pack_nodes=False):
 
         if self.graph is not None:
