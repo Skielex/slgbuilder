@@ -1,6 +1,7 @@
 from .bkbuilder import BKBuilder as MaxflowBuilder
 from .graphobject import GraphObject
 from .qpbobuilder import QPBOBuilder
+from .mqpbobuilder import MQPBOBuilder
 from .pqpbobuilder import PQPBOBuilder
 
 try:
