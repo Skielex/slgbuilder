@@ -7,9 +7,10 @@ from .slgbuilder import SLGBuilder
 
 class PQPBOBuilder(SLGBuilder):
 
-    def __init__(self, estimated_nodes=0, estimated_edges=0, flow_type=np.int32, jit_build=True):
+    def __init__(self, estimated_nodes=0, estimated_edges=0, flow_type=np.int32, jit_build=True, num_threads=-1):
         """TODO
         """
+        self.num_threads = num_threads
         super().__init__(estimated_nodes=estimated_nodes, estimated_edges=estimated_edges, flow_type=flow_type, jit_build=jit_build)
 
     def _add_nodes(self, graph_object):
@@ -27,6 +28,9 @@ class PQPBOBuilder(SLGBuilder):
             self.graph = shrdr.ParallelQpboInt(self.estimated_nodes, self.estimated_edges, expect_nonsubmodular=True, expected_blocks=len(self.objects))
         else:
             raise ValueError("Invalid flow_type '%s'. Only 'int32', 'float32' and 'float64' allowed.")
+
+        if self.num_threads > 0:
+            self.graph.set_num_threads(self.num_threads)
 
     def add_object(self, graph_object, pack_nodes=False):
         if graph_object in self.objects:
