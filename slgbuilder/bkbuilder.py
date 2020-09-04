@@ -47,7 +47,7 @@ class BKBuilder(SLGBuilder):
         else:
             raise ValueError("Invalid flow_type '%s'. Only 'int32', 'int16', 'float32' and 'float64' allowed." % str(self.flow_type))
 
-    def add_object(self, graph_object, pack_nodes=False):
+    def add_object(self, graph_object):
         if graph_object in self.objects:
             # If object is already added, return its id.
             return self.objects.index(graph_object)
@@ -62,9 +62,6 @@ class BKBuilder(SLGBuilder):
 
         self.objects.append(graph_object)
         self.nodes.append(first_id)
-
-        if pack_nodes:
-            self.nodes[-1] = self.pack_object_nodes(graph_object)
 
         return object_id
 

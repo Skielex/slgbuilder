@@ -50,11 +50,15 @@ class SLGBuilder(ABC):
         pass
 
     @abstractmethod
-    def add_object(self, graph_object, pack_nodes=False):
+    def add_object(self, graph_object):
         pass
 
-    def add_objects(self, graph_objects, pack_nodes=False):
-        return [self.add_object(o, pack_nodes=pack_nodes) for o in graph_objects]
+    @abstractmethod
+    def create_graph_object(self):
+        pass
+
+    def add_objects(self, graph_objects):
+        return [self.add_object(o) for o in graph_objects]
 
     def get_nodeids(self, graph_object):
         nodeids = self.nodes[self.objects.index(graph_object)]
@@ -99,7 +103,7 @@ class SLGBuilder(ABC):
         i, j, e00, e01, e10, e11 = i.ravel(), j.ravel(), e00.ravel(), e01.ravel(), e10.ravel(), e11.ravel()
         return i, j, e00, e01, e10, e11
 
-    def build_graph(self, pack_nodes=False, sort_pairwise_terms=False):
+    def build_graph(self, sort_pairwise_terms=False):
 
         if self.graph is not None:
             return
