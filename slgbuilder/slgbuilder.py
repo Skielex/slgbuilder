@@ -1,9 +1,13 @@
 import gc
 from abc import ABC, abstractmethod
+from multiprocessing import Pool, RawArray, cpu_count
 
 import numpy as np
 from scipy import sparse
 from sklearn.neighbors import NearestNeighbors
+
+from .graphobject import GraphObject
+from .radius_neighbor_worker import init_radius_neighbor_worker, radius_neighbor_worker
 
 
 class SLGBuilder(ABC):
@@ -22,6 +26,8 @@ class SLGBuilder(ABC):
 
         self.graph = None
 
+        self.inf_cap = None
+        self.flow_type = None
         self._set_flow_type_and_inf_cap(flow_type)
 
         if not jit_build:
@@ -185,8 +191,7 @@ class SLGBuilder(ABC):
             # Add edges to graph.
             step = 100000
             for r in range(0, i.size, step):
-                self.add_pairwise_terms(i[r:r + step], j[r:r + step], e00[r:r + step],
-                                        e01[r:r + step], e10[r:r + step], e11[r:r + step])
+                self.add_pairwise_terms(i[r:r + step], j[r:r + step], e00[r:r + step], e01[r:r + step], e10[r:r + step], e11[r:r + step])
 
     def add_boundary_cost(self, objects=None, sigma=None, symmetric=True):
         """Add boundary cost by adding edges between non-terminal nodes based on object data."""
@@ -344,8 +349,7 @@ class SLGBuilder(ABC):
 
             # Create neighbors graph.
             # Get connectivity for all within margin.
-            radius_neighbors_graph = neigh.radius_neighbors_graph(
-                object_2_points.reshape(-1, object_2_points.shape[-1]))
+            radius_neighbors_graph = neigh.radius_neighbors_graph(object_2_points.reshape(-1, object_2_points.shape[-1]))
 
             # Get indices for all combined graph connections.
             indices_2, indices_1, _ = sparse.find(radius_neighbors_graph)
@@ -531,8 +535,7 @@ class SLGBuilder(ABC):
         inner_points = inner_object.sample_points
 
         if outer_points.ndim != inner_points.ndim or outer_points.shape[-1] != inner_points.shape[-1]:
-            raise ValueError(
-                'outer_object points and inner_object points must have the same number of dimensions and the same size last dimension.')
+            raise ValueError('outer_object points and inner_object points must have the same number of dimensions and the same size last dimension.')
 
         # Check if the points are identical.
         if outer_points.shape == inner_points.shape and np.all(outer_points == inner_points):
@@ -543,8 +546,7 @@ class SLGBuilder(ABC):
                 if max_margin == 0:
                     self.add_pairwise_terms(inner_nodeids, outer_nodeids, 0, self.inf_cap, 0, 0)
                 else:
-                    self.add_pairwise_terms(inner_nodeids[:-max_margin],
-                                            outer_nodeids[max_margin:], 0, self.inf_cap, 0, 0)
+                    self.add_pairwise_terms(inner_nodeids[:-max_margin], outer_nodeids[max_margin:], 0, self.inf_cap, 0, 0)
                     self.add_pairwise_terms(inner_nodeids[-max_margin:], outer_nodeids[-1], 0, self.inf_cap, 0, 0)
 
             if min_margin is not None and outer_nodeids.shape[0] > min_margin:
@@ -552,8 +554,7 @@ class SLGBuilder(ABC):
                 if min_margin == 0:
                     self.add_pairwise_terms(outer_nodeids, inner_nodeids, 0, self.inf_cap, 0, 0)
                 else:
-                    self.add_pairwise_terms(outer_nodeids[min_margin:],
-                                            inner_nodeids[:-min_margin], 0, self.inf_cap, 0, 0)
+                    self.add_pairwise_terms(outer_nodeids[min_margin:], inner_nodeids[:-min_margin], 0, self.inf_cap, 0, 0)
                     self.add_pairwise_terms(outer_nodeids[:min_margin], inner_nodeids[0], 0, self.inf_cap, 0, 0)
 
         # Else we need to find nodes to connect.
@@ -584,8 +585,7 @@ class SLGBuilder(ABC):
                 inner_points_moved_flat = inner_points_moved.reshape(-1, outer_points.shape[-1])
 
                 # Find the 4 nearest neighbours for moved points. This should be enough.
-                radius_neighbors_graph = neigh.kneighbors_graph(
-                    inner_points_moved_flat, n_neighbors=4, mode='connectivity')
+                radius_neighbors_graph = neigh.kneighbors_graph(inner_points_moved_flat, n_neighbors=4, mode='connectivity')
 
                 # Get indices for all combined graph connections.
                 inner_indices, outer_indices, _ = sparse.find(radius_neighbors_graph)
@@ -594,8 +594,7 @@ class SLGBuilder(ABC):
 
                     # Find distances between neighbours.
                     # Create mask for neighbours futher than max margin away.
-                    distance_mask = np.sum(
-                        (outer_points_flat[outer_indices] - inner_points_flat[inner_indices])**2, axis=-1) > max_margin**2
+                    distance_mask = np.sum((outer_points_flat[outer_indices] - inner_points_flat[inner_indices])**2, axis=-1) > max_margin**2
 
                     # Only keep edges longer than max margin.
                     outer_indices = outer_indices[distance_mask]
@@ -620,8 +619,7 @@ class SLGBuilder(ABC):
                     # Get the column indices of the node indices.
                     inner_column_indices = inner_indices % inner_column_size
                     # Get first unique combination of comlumns.
-                    _, unique_column_indices = np.unique(
-                        [outer_indices, inner_column_indices], return_index=True, axis=1)
+                    _, unique_column_indices = np.unique([outer_indices, inner_column_indices], return_index=True, axis=1)
 
                     # Filter indices to have only one from an outer node to each inner column.
                     outer_indices = outer_indices[unique_column_indices]
@@ -668,8 +666,7 @@ class SLGBuilder(ABC):
                         # Get the column indices of the node indices.
                         inner_column_indices = inner_indices % inner_column_size
                         # Get first unique combination of comlumns.
-                        _, unique_column_indices = np.unique(
-                            [outer_indices, inner_column_indices], return_index=True, axis=1)
+                        _, unique_column_indices = np.unique([outer_indices, inner_column_indices], return_index=True, axis=1)
 
                         # Filter indices to have only one edge between each column.
                         outer_indices = outer_indices[unique_column_indices]
@@ -682,8 +679,7 @@ class SLGBuilder(ABC):
                         # Get the column indices of the node indices.
                         outer_column_indices = outer_indices % outer_columns_size
                         # Get first unique combination of comlumns.
-                        _, unique_column_indices = np.unique(
-                            [outer_column_indices, inner_indices], return_index=True, axis=1)
+                        _, unique_column_indices = np.unique([outer_column_indices, inner_indices], return_index=True, axis=1)
 
                         # Filter indices to have only one edge between each column.
                         outer_indices = outer_indices[unique_column_indices]
@@ -710,8 +706,6 @@ class SLGBuilder(ABC):
         # Get points.
         object_1_points = object_1.sample_points
         object_2_points = object_2.sample_points
-
-        # TODO Avoid searching for neigbours if possible.
 
         # Create nearest neighbors tree.
         neigh = NearestNeighbors(radius=margin, metric=distance_metric)
@@ -754,5 +748,90 @@ class SLGBuilder(ABC):
             indices_2 = indices_2[unique_column_indices]
 
         # Add exclusion terms.
-        self.add_pairwise_terms(object_1_nodeids.flat[indices_1],
-                                object_2_nodeids.flat[indices_2], 0, 0, 0, self.inf_cap)
+        self.add_pairwise_terms(object_1_nodeids.flat[indices_1], object_2_nodeids.flat[indices_2], 0, 0, 0, self.inf_cap)
+
+    def add_layered_exclusions(self, objects, margin=1, distance_metric='l1', reduce_redundancy=True, n_jobs=-1):
+        """Add exclsion constraint edges forcing pairs of objects defined as a dictinary of lists.
+        The function uses multiple processes to speed up the task.
+        """
+
+        # Use all CPUs if n_jobs is -1.
+        if n_jobs == -1:
+            n_jobs = cpu_count()
+        elif n_jobs == 0:
+            n_jobs = 1
+
+        # Count number of exclusions. If there's less than two we don't want to use more jobs.
+        exclusion_count = sum(len(objects[k]) for k in objects)
+
+        if n_jobs < 2 or exclusion_count < 2:
+            # Run in serial.
+            for object_1 in objects:
+                for object_2 in objects[object_1]:
+                    self.add_layered_exclusion(object_1, object_2, margin=margin, distance_metric=distance_metric, reduce_redundancy=reduce_redundancy)
+
+            # Return.
+            return
+
+        # Dictionary to store sharable RawArrays.
+        sample_points_dic = {}
+        sample_points_shape_dic = {}
+        sample_points_dtype_dic = {}
+        sample_points_indices = []
+
+        def create_sharable_array(a):
+            """Creates a shareable RawArray from a Numpy array."""
+            ctype = np.ctypeslib.as_ctypes_type(a.dtype)
+            raw = RawArray(ctype, a.size)
+            raw_np = np.frombuffer(raw, dtype=a.dtype)
+            raw_np[:] = a.ravel()
+            return raw
+
+        def prepare_sample_points(o):
+            """Creates a tuple with data needed for worker."""
+            idx = self.objects.index(o)
+
+            points_raw = sample_points_dic.get(idx, None)
+            if points_raw is None:
+                points_raw = create_sharable_array(o.sample_points)
+                sample_points_dic[idx] = points_raw
+
+            sample_points_shape_dic[idx] = o.sample_points.shape
+            sample_points_dtype_dic[idx] = o.sample_points.dtype
+
+            return idx
+
+        for object_1 in objects:
+            idx_1 = prepare_sample_points(object_1)
+            objects_2 = objects[object_1]
+            for object_2 in objects_2:
+                idx_2 = prepare_sample_points(object_2)
+                sample_points_indices.append((idx_1, idx_2))
+
+        init_args = {
+            'margin': margin,
+            'distance_metric': distance_metric,
+            'reduce_redundancy': reduce_redundancy,
+            'sample_points_dic': sample_points_dic,
+            'sample_points_shape_dic': sample_points_shape_dic,
+            'sample_points_dtype_dic': sample_points_dtype_dic,
+        }
+        with Pool(processes=n_jobs, initializer=init_radius_neighbor_worker, initargs=(init_args, )) as pool:
+            indices_list = pool.map(radius_neighbor_worker, sample_points_indices)
+
+        for object_1 in objects:
+            # Get nodeids.
+            object_1_nodeids = self.get_nodeids(object_1)
+
+            objects_2 = objects[object_1]
+
+            for object_2 in objects_2:
+
+                # Get nodeids.
+                object_2_nodeids = self.get_nodeids(object_2)
+
+                # Get indices.
+                indices_1, indices_2 = indices_list.pop(0)
+
+                if indices_1.size > 0:
+                    self.add_pairwise_terms(object_1_nodeids.flat[indices_1], object_2_nodeids.flat[indices_2], 0, 0, 0, self.inf_cap)
