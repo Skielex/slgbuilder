@@ -19,14 +19,19 @@ class MQPBOBuilder(SLGBuilder):
         if flow_type == np.int32:
             self.flow_type = np.int32
             self.inf_cap = self.INF_CAP_INT32
+        elif flow_type == np.float32:
+            self.flow_type = np.float32
+            self.inf_cap = self.INF_CAP_FLOAT32
         else:
-            raise ValueError("Invalid flow_type '%s'. Only 'int32', 'float32' and 'float64' allowed.")
+            raise ValueError("Invalid flow_type '%s'. Only 'int32' and 'float32' allowed.")
 
     def create_graph_object(self):
         if self.flow_type == np.int32:
             self.graph = shrdr.QpboInt(self.estimated_nodes, self.estimated_edges, expect_nonsubmodular=True)
+        elif self.flow_type == np.float32:
+            self.graph = shrdr.QpboFloat(self.estimated_nodes, self.estimated_edges, expect_nonsubmodular=True)
         else:
-            raise ValueError("Invalid flow_type '%s'. Only 'int32', 'float32' and 'float64' allowed.")
+            raise ValueError("Invalid flow_type '%s'. Only 'int32' and 'float32' allowed.")
 
     def add_object(self, graph_object):
         if graph_object in self.objects:
