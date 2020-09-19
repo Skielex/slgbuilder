@@ -18,8 +18,22 @@ class SLGBuilder(ABC):
     INF_CAP_FLOAT32 = 1 << 16
     INF_CAP_FLOAT64 = 1 << 32
 
+    INF_CAP_MAP = {
+        'int16': INF_CAP_INT16,
+        'int32': INF_CAP_INT32,
+        'int64': INF_CAP_INT64,
+        'float32': INF_CAP_FLOAT32,
+        'float64': INF_CAP_FLOAT64,
+    }
+
     def __init__(self, estimated_nodes=0, estimated_edges=0, flow_type=np.int32, jit_build=True):
         """Creates a ```SLGBuilder``` object used by subclasses to create graphs."""
+        
+        try:
+            flow_type = np.dtype(flow_type)
+        except:
+            raise ValueError(f"Invalid flow type '{flow_type}'. Must be a valid NumPy dtype.")
+        
         self.estimated_nodes = estimated_nodes
         self.estimated_edges = estimated_edges
         self.jit_build = jit_build

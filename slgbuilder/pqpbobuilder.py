@@ -6,33 +6,38 @@ from .slgbuilder import SLGBuilder
 
 
 class PQPBOBuilder(SLGBuilder):
-
     def __init__(self, estimated_nodes=0, estimated_edges=0, flow_type=np.int32, jit_build=True, num_threads=-1):
-        """TODO
-        """
+        """TODO"""
         self.num_threads = num_threads
-        super().__init__(estimated_nodes=estimated_nodes, estimated_edges=estimated_edges, flow_type=flow_type, jit_build=jit_build)
+        super().__init__(estimated_nodes=estimated_nodes,
+                         estimated_edges=estimated_edges,
+                         flow_type=flow_type,
+                         jit_build=jit_build)
 
     def _add_nodes(self, graph_object):
         return self.graph.add_node(graph_object.data.size, self.objects.index(graph_object))
 
     def _set_flow_type_and_inf_cap(self, flow_type):
-        if flow_type == np.int32:
-            self.flow_type = np.int32
-            self.inf_cap = self.INF_CAP_INT32
-        elif flow_type == np.float32:
-            self.flow_type = np.float32
-            self.inf_cap = self.INF_CAP_FLOAT32
-        else:
-            raise ValueError("Invalid flow_type '%s'. Only 'int32' and 'float32' allowed.")
+
+        # Test if flow type is valid.
+        shrdr.qpbo(capacity_type=flow_type)
+
+        # Set infinite capacity value.
+        self.inf_cap = self.INF_CAP_MAP.get(flow_type.name, None)
+
+        # Check if a value was found.
+        if self.inf_cap is None:
+            raise ValueError(f"Invalid flow type '{flow_type}'. Supported types are: {', '.join(self.INF_CAP_MAP)}")
+
+        # Set flow type.
+        self.flow_type = flow_type
 
     def create_graph_object(self):
-        if self.flow_type == np.int32:
-            self.graph = shrdr.ParallelQpboInt(self.estimated_nodes, self.estimated_edges, expect_nonsubmodular=True, expected_blocks=len(self.objects))
-        elif self.flow_type == np.float32:
-            self.graph = shrdr.ParallelQpboFloat(self.estimated_nodes, self.estimated_edges, expect_nonsubmodular=True)
-        else:
-            raise ValueError("Invalid flow_type '%s'. Only 'int32' and 'float32' allowed.")
+        self.graph = shrdr.parallel_qpbo(self.estimated_nodes,
+                                         self.estimated_edges,
+                                         expect_nonsubmodular=True,
+                                         expected_blocks=len(self.objects),
+                                         capacity_type=self.flow_type)
 
         if self.num_threads > 0:
             self.graph.set_num_threads(self.num_threads)
@@ -98,4 +103,3 @@ class PQPBOBuilder(SLGBuilder):
         if compute_weak_persistencies:
             self.graph.compute_weak_persistencies()
         return self.graph.compute_twice_energy()
-
