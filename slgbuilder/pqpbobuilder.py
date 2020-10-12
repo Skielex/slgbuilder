@@ -6,16 +6,36 @@ from .slgbuilder import SLGBuilder
 
 
 class PQPBOBuilder(SLGBuilder):
-    def __init__(self, estimated_nodes=0, estimated_edges=0, flow_type=np.int32, jit_build=True, num_threads=-1):
+    def __init__(self, estimated_nodes=0, estimated_edges=0, flow_type=np.int32, jit_build=True, num_threads=-1, min_block_nodes=100000):
         """TODO"""
         self.num_threads = num_threads
-        super().__init__(estimated_nodes=estimated_nodes,
-                         estimated_edges=estimated_edges,
-                         flow_type=flow_type,
-                         jit_build=jit_build)
+
+        # Block properties.
+        self.min_block_nodes = min_block_nodes
+        self.object_block_indices = []
+        self.current_block_index = 0
+        self.current_block_nodes = 0
+
+        super().__init__(
+            estimated_nodes=estimated_nodes,
+            estimated_edges=estimated_edges,
+            flow_type=flow_type,
+            jit_build=jit_build,
+        )
 
     def _add_nodes(self, graph_object):
-        return self.graph.add_node(graph_object.data.size, self.objects.index(graph_object))
+
+        # Get current block index.
+        block_index = self.current_block_index
+        self.object_block_indices.append(block_index)
+
+        # Increase block index if enough nodes have been added.
+        self.current_block_nodes += graph_object.data.size
+        if self.current_block_nodes >= self.min_block_nodes:
+            self.current_block_index += 1
+            self.current_block_nodes = 0
+
+        return self.graph.add_node(graph_object.data.size, block_index)
 
     def _set_flow_type_and_inf_cap(self, flow_type):
 
