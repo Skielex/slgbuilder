@@ -6,8 +6,13 @@ from .slgbuilder import SLGBuilder
 
 
 class ORBuilder(SLGBuilder):
-
-    def __init__(self, estimated_nodes=0, estimated_edges=0, flow_type=np.int64, jit_build=True):
+    def __init__(
+        self,
+        estimated_nodes=0,
+        estimated_edges=0,
+        capacity_type=np.int64,
+        jit_build=True,
+    ):
         """Creates a helper for creating and solves a maxflow graph using the Google OR-Tools maxflow implementation. 
         Only integer edge capacities/energies are supported.
 
@@ -16,23 +21,32 @@ class ORBuilder(SLGBuilder):
         """
         self.source_nodeids = []
         self.sink_nodeids = []
-        super().__init__(estimated_nodes=estimated_nodes, estimated_edges=estimated_edges, flow_type=flow_type, jit_build=jit_build)
+        super().__init__(
+            estimated_nodes=estimated_nodes,
+            estimated_edges=estimated_edges,
+            flow_type=capacity_type,
+            capacity_type=capacity_type,
+            arc_index_type=np.int64,
+            node_index_type=np.int32,
+            jit_build=jit_build,
+        )
 
-    def _set_flow_type_and_inf_cap(self, flow_type):
-        if np.issubdtype(flow_type, np.integer):
+    def _test_types_and_set_inf_cap(self):
+        if np.issubdtype(self.capacity_type, np.integer):
+            self.capacity_type = np.int64
             self.flow_type = np.int64
             self.inf_cap = self.INF_CAP_INT64
         else:
-            raise ValueError("Invalid flow_type '%s'. Only 'integer' allowed." % str(flow_type))
+            raise ValueError(f"Invalid capacity type '{self.capacity_type}'. Only 'integer' allowed.")
 
     def _add_nodes(self, graph_object):
         pass
 
     def create_graph_object(self):
-        if np.issubdtype(self.flow_type, np.integer):
+        if np.issubdtype(self.capacity_type, np.integer):
             self.graph = pywrapgraph.SimpleMaxFlow()
         else:
-            raise ValueError("Invalid flow_type '%s'. Only 'integer' allowed." % str(flow_type))
+            raise ValueError(f"Invalid capacity type '{self.capacity_type}'. Only 'integer' allowed.")
 
     def add_object(self, graph_object):
         if graph_object in self.objects:
@@ -57,23 +71,27 @@ class ORBuilder(SLGBuilder):
         i, j, e00, e01, e10, e11 = np.broadcast_arrays(i, j, 0, cap, rcap, 0)
 
         if self.graph is None:
-            self.pairwise_from.append(i.flatten().astype(np.int32))
-            self.pairwise_to.append(j.flatten().astype(np.int32))
-            self.pairwise_e00.append(e00.flatten().astype(self.flow_type))
-            self.pairwise_e01.append(e01.flatten().astype(self.flow_type))
-            self.pairwise_e10.append(e10.flatten().astype(self.flow_type))
-            self.pairwise_e11.append(e11.flatten().astype(self.flow_type))
+            self.pairwise_from.append(i.ravel().astype(self.node_index_type))
+            self.pairwise_to.append(j.ravel().astype(self.node_index_type))
+            self.pairwise_e00.append(e00.ravel().astype(self.flow_type))
+            self.pairwise_e01.append(e01.ravel().astype(self.flow_type))
+            self.pairwise_e10.append(e10.ravel().astype(self.flow_type))
+            self.pairwise_e11.append(e11.ravel().astype(self.flow_type))
         else:
             e01_mask = e01 > 0
             e10_mask = e10 > 0
 
             if np.any(e01_mask):
-                [self.graph.AddArcWithCapacity(i, j, c) for i, j, c in zip(
-                    i[e01_mask].tolist(), j[e01_mask].tolist(), e01[e01_mask].tolist())]
+                [
+                    self.graph.AddArcWithCapacity(i, j, c)
+                    for i, j, c in zip(i[e01_mask].tolist(), j[e01_mask].tolist(), e01[e01_mask].tolist())
+                ]
 
             if np.any(e10_mask):
-                [self.graph.AddArcWithCapacity(j, i, c) for i, j, c in zip(
-                    i[e10_mask].tolist(), j[e10_mask].tolist(), e10[e10_mask].tolist())]
+                [
+                    self.graph.AddArcWithCapacity(j, i, c)
+                    for i, j, c in zip(i[e10_mask].tolist(), j[e10_mask].tolist(), e10[e10_mask].tolist())
+                ]
 
     def add_unary_terms(self, i, e0, e1):
         self.add_terminal_edges(i, e1, e0)
@@ -82,9 +100,9 @@ class ORBuilder(SLGBuilder):
         i, e0, e1 = np.broadcast_arrays(i, sink_cap, source_cap)
 
         if self.graph is None:
-            self.unary_nodes.append(i.flatten().astype(np.int32))
-            self.unary_e0.append(e0.flatten())
-            self.unary_e1.append(e1.flatten())
+            self.unary_nodes.append(i.ravel().astype(self.node_index_type))
+            self.unary_e0.append(e0.ravel().astype(self.flow_type))
+            self.unary_e1.append(e1.ravel().astype(self.flow_type))
         else:
             e0_mask = e0 > 0
             e1_mask = e1 > 0

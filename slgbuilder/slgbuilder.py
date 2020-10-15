@@ -26,14 +26,18 @@ class SLGBuilder(ABC):
         'float64': INF_CAP_FLOAT64,
     }
 
-    def __init__(self, estimated_nodes=0, estimated_edges=0, flow_type=np.int32, jit_build=True):
+    def __init__(
+        self,
+        estimated_nodes=0,
+        estimated_edges=0,
+        flow_type=np.int64,
+        capacity_type=np.int32,
+        arc_index_type=np.uint32,
+        node_index_type=np.uint32,
+        jit_build=True,
+    ):
         """Creates a ```SLGBuilder``` object used by subclasses to create graphs."""
-        
-        try:
-            flow_type = np.dtype(flow_type)
-        except:
-            raise ValueError(f"Invalid flow type '{flow_type}'. Must be a valid NumPy dtype.")
-        
+
         self.estimated_nodes = estimated_nodes
         self.estimated_edges = estimated_edges
         self.jit_build = jit_build
@@ -41,8 +45,11 @@ class SLGBuilder(ABC):
         self.graph = None
 
         self.inf_cap = None
-        self.flow_type = None
-        self._set_flow_type_and_inf_cap(flow_type)
+        self.flow_type = np.dtype(flow_type)
+        self.capacity_type = np.dtype(capacity_type)
+        self.arc_index_type = np.dtype(arc_index_type)
+        self.node_index_type = np.dtype(node_index_type)
+        self._test_types_and_set_inf_cap()
 
         if not jit_build:
             self.create_graph_object()
@@ -66,7 +73,7 @@ class SLGBuilder(ABC):
         pass
 
     @abstractmethod
-    def _set_flow_type_and_inf_cap(self, flow_type):
+    def _test_types_and_set_inf_cap(self):
         pass
 
     @abstractmethod
@@ -105,20 +112,20 @@ class SLGBuilder(ABC):
         pass
 
     def broadcast_unary_terms(self, i, e0, e1):
-        i = np.asarray(i, dtype=np.uint32)
-        e0 = np.asarray(e0, dtype=self.flow_type)
-        e1 = np.asarray(e1, dtype=self.flow_type)
+        i = np.asarray(i, dtype=self.node_index_type)
+        e0 = np.asarray(e0, dtype=self.capacity_type)
+        e1 = np.asarray(e1, dtype=self.capacity_type)
         i, e0, e1 = np.broadcast_arrays(i, e0, e1)
         i, e0, e1 = i.ravel(), e0.ravel(), e1.ravel()
         return i, e0, e1
 
     def broadcast_pairwise_terms(self, i, j, e00, e01, e10, e11):
-        i = np.asarray(i, dtype=np.uint32)
-        j = np.asarray(j, dtype=np.uint32)
-        e00 = np.asarray(e00, dtype=self.flow_type)
-        e01 = np.asarray(e01, dtype=self.flow_type)
-        e10 = np.asarray(e10, dtype=self.flow_type)
-        e11 = np.asarray(e11, dtype=self.flow_type)
+        i = np.asarray(i, dtype=self.node_index_type)
+        j = np.asarray(j, dtype=self.node_index_type)
+        e00 = np.asarray(e00, dtype=self.capacity_type)
+        e01 = np.asarray(e01, dtype=self.capacity_type)
+        e10 = np.asarray(e10, dtype=self.capacity_type)
+        e11 = np.asarray(e11, dtype=self.capacity_type)
         i, j, e00, e01, e10, e11 = np.broadcast_arrays(i, j, e00, e01, e10, e11)
         i, j, e00, e01, e10, e11 = i.ravel(), j.ravel(), e00.ravel(), e01.ravel(), e10.ravel(), e11.ravel()
         return i, j, e00, e01, e10, e11
@@ -205,7 +212,8 @@ class SLGBuilder(ABC):
             # Add edges to graph.
             step = 100000
             for r in range(0, i.size, step):
-                self.add_pairwise_terms(i[r:r + step], j[r:r + step], e00[r:r + step], e01[r:r + step], e10[r:r + step], e11[r:r + step])
+                self.add_pairwise_terms(i[r:r + step], j[r:r + step], e00[r:r + step], e01[r:r + step], e10[r:r + step],
+                                        e11[r:r + step])
 
     def add_boundary_cost(self, objects=None, sigma=None, symmetric=True):
         """Add boundary cost by adding edges between non-terminal nodes based on object data."""
@@ -215,7 +223,7 @@ class SLGBuilder(ABC):
 
         # Calculates boundary penalties using.
         def get_boundary_cost(diff):
-            if issubclass(self.flow_type, np.integer):
+            if issubclass(self.capacity_type, np.integer):
                 diff = diff.astype(np.float)
             else:
                 diff = diff.copy()
@@ -241,8 +249,8 @@ class SLGBuilder(ABC):
             diff *= max_value
             diff += min_value
 
-            if issubclass(self.flow_type, np.integer):
-                diff = np.round(diff).astype(self.flow_type)
+            if issubclass(self.capacity_type, np.integer):
+                diff = np.round(diff).astype(self.capacity_type)
 
             return diff
 
@@ -353,7 +361,8 @@ class SLGBuilder(ABC):
         object_2_points = object_2.sample_points
 
         # TODO Avoid searching for neigbours if possible.
-        if margin == 0 and object_1_points.shape == object_2_points.shape and np.all(object_1_points == object_2_points):
+        if margin == 0 and object_1_points.shape == object_2_points.shape and np.all(
+                object_1_points == object_2_points):
             # Add containment edges.
             self.add_pairwise_terms(object_1_nodeids, object_2_nodeids, 0, 0, 0, self.inf_cap)
         else:
@@ -363,7 +372,8 @@ class SLGBuilder(ABC):
 
             # Create neighbors graph.
             # Get connectivity for all within margin.
-            radius_neighbors_graph = neigh.radius_neighbors_graph(object_2_points.reshape(-1, object_2_points.shape[-1]))
+            radius_neighbors_graph = neigh.radius_neighbors_graph(object_2_points.reshape(
+                -1, object_2_points.shape[-1]))
 
             # Get indices for all combined graph connections.
             indices_2, indices_1, _ = sparse.find(radius_neighbors_graph)
@@ -421,7 +431,7 @@ class SLGBuilder(ABC):
 
             # Calculate weights (Eq1).
             # Prevent empty solution (sec 4.1).
-            w = np.zeros(obj.data.shape, dtype=self.flow_type)
+            w = np.zeros(obj.data.shape, dtype=self.capacity_type)
             w[0] = -self.inf_cap
             w[1:] = np.diff(obj.data, axis=0)
 
@@ -534,7 +544,13 @@ class SLGBuilder(ABC):
                         self.add_pairwise_terms(ids[:-dx, -1], ids[dx:, 0], 0, self.inf_cap, 0, 0)
                         self.add_pairwise_terms(ids[:-dx, 0], ids[dx:, -1], 0, self.inf_cap, 0, 0)
 
-    def add_layered_containment(self, outer_object, inner_object, min_margin=0, max_margin=None, distance_metric='l2', reduce_redundancy=True):
+    def add_layered_containment(self,
+                                outer_object,
+                                inner_object,
+                                min_margin=0,
+                                max_margin=None,
+                                distance_metric='l2',
+                                reduce_redundancy=True):
         """Add layered containment."""
 
         if outer_object == inner_object:
@@ -549,7 +565,9 @@ class SLGBuilder(ABC):
         inner_points = inner_object.sample_points
 
         if outer_points.ndim != inner_points.ndim or outer_points.shape[-1] != inner_points.shape[-1]:
-            raise ValueError('outer_object points and inner_object points must have the same number of dimensions and the same size last dimension.')
+            raise ValueError(
+                'outer_object points and inner_object points must have the same number of dimensions and the same size last dimension.'
+            )
 
         # Check if the points are identical.
         if outer_points.shape == inner_points.shape and np.all(outer_points == inner_points):
@@ -560,7 +578,8 @@ class SLGBuilder(ABC):
                 if max_margin == 0:
                     self.add_pairwise_terms(inner_nodeids, outer_nodeids, 0, self.inf_cap, 0, 0)
                 else:
-                    self.add_pairwise_terms(inner_nodeids[:-max_margin], outer_nodeids[max_margin:], 0, self.inf_cap, 0, 0)
+                    self.add_pairwise_terms(inner_nodeids[:-max_margin], outer_nodeids[max_margin:], 0, self.inf_cap, 0,
+                                            0)
                     self.add_pairwise_terms(inner_nodeids[-max_margin:], outer_nodeids[-1], 0, self.inf_cap, 0, 0)
 
             if min_margin is not None and outer_nodeids.shape[0] > min_margin:
@@ -568,7 +587,8 @@ class SLGBuilder(ABC):
                 if min_margin == 0:
                     self.add_pairwise_terms(outer_nodeids, inner_nodeids, 0, self.inf_cap, 0, 0)
                 else:
-                    self.add_pairwise_terms(outer_nodeids[min_margin:], inner_nodeids[:-min_margin], 0, self.inf_cap, 0, 0)
+                    self.add_pairwise_terms(outer_nodeids[min_margin:], inner_nodeids[:-min_margin], 0, self.inf_cap, 0,
+                                            0)
                     self.add_pairwise_terms(outer_nodeids[:min_margin], inner_nodeids[0], 0, self.inf_cap, 0, 0)
 
         # Else we need to find nodes to connect.
@@ -599,7 +619,9 @@ class SLGBuilder(ABC):
                 inner_points_moved_flat = inner_points_moved.reshape(-1, outer_points.shape[-1])
 
                 # Find the 4 nearest neighbours for moved points. This should be enough.
-                radius_neighbors_graph = neigh.kneighbors_graph(inner_points_moved_flat, n_neighbors=4, mode='connectivity')
+                radius_neighbors_graph = neigh.kneighbors_graph(inner_points_moved_flat,
+                                                                n_neighbors=4,
+                                                                mode='connectivity')
 
                 # Get indices for all combined graph connections.
                 inner_indices, outer_indices, _ = sparse.find(radius_neighbors_graph)
@@ -608,7 +630,8 @@ class SLGBuilder(ABC):
 
                     # Find distances between neighbours.
                     # Create mask for neighbours futher than max margin away.
-                    distance_mask = np.sum((outer_points_flat[outer_indices] - inner_points_flat[inner_indices])**2, axis=-1) > max_margin**2
+                    distance_mask = np.sum((outer_points_flat[outer_indices] - inner_points_flat[inner_indices])**2,
+                                           axis=-1) > max_margin**2
 
                     # Only keep edges longer than max margin.
                     outer_indices = outer_indices[distance_mask]
@@ -633,7 +656,9 @@ class SLGBuilder(ABC):
                     # Get the column indices of the node indices.
                     inner_column_indices = inner_indices % inner_column_size
                     # Get first unique combination of comlumns.
-                    _, unique_column_indices = np.unique([outer_indices, inner_column_indices], return_index=True, axis=1)
+                    _, unique_column_indices = np.unique([outer_indices, inner_column_indices],
+                                                         return_index=True,
+                                                         axis=1)
 
                     # Filter indices to have only one from an outer node to each inner column.
                     outer_indices = outer_indices[unique_column_indices]
@@ -680,7 +705,9 @@ class SLGBuilder(ABC):
                         # Get the column indices of the node indices.
                         inner_column_indices = inner_indices % inner_column_size
                         # Get first unique combination of comlumns.
-                        _, unique_column_indices = np.unique([outer_indices, inner_column_indices], return_index=True, axis=1)
+                        _, unique_column_indices = np.unique([outer_indices, inner_column_indices],
+                                                             return_index=True,
+                                                             axis=1)
 
                         # Filter indices to have only one edge between each column.
                         outer_indices = outer_indices[unique_column_indices]
@@ -693,7 +720,9 @@ class SLGBuilder(ABC):
                         # Get the column indices of the node indices.
                         outer_column_indices = outer_indices % outer_columns_size
                         # Get first unique combination of comlumns.
-                        _, unique_column_indices = np.unique([outer_column_indices, inner_indices], return_index=True, axis=1)
+                        _, unique_column_indices = np.unique([outer_column_indices, inner_indices],
+                                                             return_index=True,
+                                                             axis=1)
 
                         # Filter indices to have only one edge between each column.
                         outer_indices = outer_indices[unique_column_indices]
@@ -762,7 +791,8 @@ class SLGBuilder(ABC):
             indices_2 = indices_2[unique_column_indices]
 
         # Add exclusion terms.
-        self.add_pairwise_terms(object_1_nodeids.flat[indices_1], object_2_nodeids.flat[indices_2], 0, 0, 0, self.inf_cap)
+        self.add_pairwise_terms(object_1_nodeids.flat[indices_1], object_2_nodeids.flat[indices_2], 0, 0, 0,
+                                self.inf_cap)
 
     def add_layered_exclusions(self, objects, margin=1, distance_metric='l1', reduce_redundancy=True, n_jobs=-1):
         """Add exclsion constraint edges forcing pairs of objects defined as a dictinary of lists.
@@ -782,7 +812,11 @@ class SLGBuilder(ABC):
             # Run in serial.
             for object_1 in objects:
                 for object_2 in objects[object_1]:
-                    self.add_layered_exclusion(object_1, object_2, margin=margin, distance_metric=distance_metric, reduce_redundancy=reduce_redundancy)
+                    self.add_layered_exclusion(object_1,
+                                               object_2,
+                                               margin=margin,
+                                               distance_metric=distance_metric,
+                                               reduce_redundancy=reduce_redundancy)
 
             # Return.
             return
@@ -848,4 +882,5 @@ class SLGBuilder(ABC):
                 indices_1, indices_2 = indices_list.pop(0)
 
                 if indices_1.size > 0:
-                    self.add_pairwise_terms(object_1_nodeids.flat[indices_1], object_2_nodeids.flat[indices_2], 0, 0, 0, self.inf_cap)
+                    self.add_pairwise_terms(object_1_nodeids.flat[indices_1], object_2_nodeids.flat[indices_2], 0, 0, 0,
+                                            self.inf_cap)

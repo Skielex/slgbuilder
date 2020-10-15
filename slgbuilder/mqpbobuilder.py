@@ -6,36 +6,56 @@ from .slgbuilder import SLGBuilder
 
 
 class MQPBOBuilder(SLGBuilder):
-    def __init__(self, estimated_nodes=0, estimated_edges=0, flow_type=np.int32, jit_build=True):
+    def __init__(
+        self,
+        estimated_nodes=0,
+        estimated_edges=0,
+        capacity_type=np.int32,
+        arc_index_type=np.uint32,
+        node_index_type=np.uint32,
+        jit_build=True,
+    ):
         """TODO"""
-        super().__init__(estimated_nodes=estimated_nodes,
-                         estimated_edges=estimated_edges,
-                         flow_type=flow_type,
-                         jit_build=jit_build)
+        flow_type = np.int64 if np.issubdtype(capacity_type, np.integer) else np.float64
+        super().__init__(
+            estimated_nodes=estimated_nodes,
+            estimated_edges=estimated_edges,
+            flow_type=flow_type,
+            capacity_type=capacity_type,
+            arc_index_type=arc_index_type,
+            node_index_type=node_index_type,
+            jit_build=jit_build,
+        )
 
     def _add_nodes(self, graph_object):
         return self.graph.add_node(graph_object.data.size)
 
-    def _set_flow_type_and_inf_cap(self, flow_type):
+    def _test_types_and_set_inf_cap(self):
 
         # Test if flow type is valid.
-        shrdr.qpbo(capacity_type=flow_type)
+        shrdr.qpbo(
+            capacity_type=self.capacity_type,
+            arc_index_type=self.arc_index_type,
+            node_index_type=self.node_index_type,
+        )
 
         # Set infinite capacity value.
-        self.inf_cap = self.INF_CAP_MAP.get(flow_type.name, None)
+        self.inf_cap = self.INF_CAP_MAP.get(self.capacity_type.name, None)
 
         # Check if a value was found.
         if self.inf_cap is None:
-            raise ValueError(f"Invalid flow type '{flow_type}'. Supported types are: {', '.join(self.INF_CAP_MAP)}")
-
-        # Set flow type.
-        self.flow_type = flow_type
+            raise ValueError(
+                f"Invalid capacity type '{self.capacity_type}'. Supported types are: {', '.join(self.INF_CAP_MAP)}")
 
     def create_graph_object(self):
-        self.graph = shrdr.qpbo(self.estimated_nodes,
-                                self.estimated_edges,
-                                expect_nonsubmodular=True,
-                                capacity_type=self.flow_type)
+        self.graph = shrdr.qpbo(
+            self.estimated_nodes,
+            self.estimated_edges,
+            expect_nonsubmodular=True,
+            capacity_type=self.capacity_type,
+            arc_index_type=self.arc_index_type,
+            node_index_type=self.node_index_type,
+        )
 
     def add_object(self, graph_object):
         if graph_object in self.objects:

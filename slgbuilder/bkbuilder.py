@@ -6,7 +6,7 @@ from .slgbuilder import SLGBuilder
 
 
 class BKBuilder(SLGBuilder):
-    def __init__(self, estimated_nodes=0, estimated_edges=0, flow_type=np.int32, jit_build=True):
+    def __init__(self, estimated_nodes=0, estimated_edges=0, capacity_type=np.int32, jit_build=True):
         """Creates a helper for creating and solves a maxflow graph using the Boykov-Kolmogorov (BK) maxflow implementation. 
         int (int32), short (int16), float (float32) or double (float64) edge capacities/energies are supported.
 
@@ -14,38 +14,47 @@ class BKBuilder(SLGBuilder):
         It uses a modified version of Maxflow algorithm by Yuri Boykov and Vladimir Kolmogorov availble at https://github.com/Skielex/maxflow.
         The BK maxflow implementation is a Augmenting-Path type algorithm.
         """
-        super().__init__(estimated_nodes=estimated_nodes, estimated_edges=estimated_edges, flow_type=flow_type, jit_build=jit_build)
+        flow_type = capacity_type if np.issubdtype(capacity_type, np.floating) else np.int32
+        super().__init__(
+            estimated_nodes=estimated_nodes,
+            estimated_edges=estimated_edges,
+            flow_type=flow_type,
+            capacity_type=capacity_type,
+            arc_index_type=np.int64,
+            node_index_type=np.int32,
+            jit_build=jit_build,
+        )
 
-    def _set_flow_type_and_inf_cap(self, flow_type):
-        if flow_type == np.int32:
-            self.flow_type = np.int32
-            self.inf_cap = self.INF_CAP_INT32
-        elif flow_type == np.int16:
-            self.flow_type = np.int16
+    def _test_types_and_set_inf_cap(self):
+        if self.capacity_type == np.int16:
             self.inf_cap = self.INF_CAP_INT16
-        elif flow_type == np.float32:
-            self.flow_type = np.float32
+        elif self.capacity_type == np.int32:
+            self.inf_cap = self.INF_CAP_INT32
+        elif self.capacity_type == np.float32:
             self.inf_cap = self.INF_CAP_FLOAT32
-        elif flow_type == np.float64:
-            self.flow_type = np.float64
+        elif self.capacity_type == np.float64:
             self.inf_cap = self.INF_CAP_FLOAT64
         else:
-            raise ValueError("Invalid flow_type '%s'. Only 'int32', 'int16', 'float32' and 'float64' allowed." % str(flow_type))
+            raise ValueError(
+                f"Invalid capacity type '{self.capacity_type}'. Only 'int16', 'int32', 'float32' and 'float64' allowed."
+            )
 
     def _add_nodes(self, graph_object):
         return self.graph.add_node(graph_object.data.size)
 
     def create_graph_object(self):
-        if self.flow_type == np.int32:
-            self.graph = thinmaxflow.GraphInt(self.estimated_nodes, self.estimated_edges)
-        elif self.flow_type == np.int16:
+        if self.capacity_type == np.int16:
             self.graph = thinmaxflow.GraphShort(self.estimated_nodes, self.estimated_edges)
-        elif self.flow_type == np.float32:
+        elif self.capacity_type == np.int32:
+            self.graph = thinmaxflow.GraphInt(self.estimated_nodes, self.estimated_edges)
+        elif self.capacity_type == np.float32:
             self.graph = thinmaxflow.GraphFloat(self.estimated_nodes, self.estimated_edges)
-        elif self.flow_type == np.float64:
+        elif self.capacity_type == np.float64:
             self.graph = thinmaxflow.GraphDouble(self.estimated_nodes, self.estimated_edges)
         else:
-            raise ValueError("Invalid flow_type '%s'. Only 'int32', 'int16', 'float32' and 'float64' allowed." % str(self.flow_type))
+            raise ValueError(
+                f"Invalid capacity type '{self.capacity_type}'. Only 'int16', 'int32', 'float32' and 'float64' allowed."
+            )
 
     def add_object(self, graph_object):
         if graph_object in self.objects:
@@ -82,12 +91,12 @@ class BKBuilder(SLGBuilder):
         if self.graph is None:
             i, j, e00, e01, e10, e11 = np.broadcast_arrays(i, j, 0, cap, rcap, 0)
 
-            self.pairwise_from.append(i.flatten().astype(np.int32))
-            self.pairwise_to.append(j.flatten().astype(np.int32))
-            self.pairwise_e00.append(e00.flatten().astype(self.flow_type))
-            self.pairwise_e01.append(e01.flatten().astype(self.flow_type))
-            self.pairwise_e10.append(e10.flatten().astype(self.flow_type))
-            self.pairwise_e11.append(e11.flatten().astype(self.flow_type))
+            self.pairwise_from.append(i.ravel().astype(self.node_index_type))
+            self.pairwise_to.append(j.ravel().astype(self.node_index_type))
+            self.pairwise_e00.append(e00.ravel().astype(self.capacity_type))
+            self.pairwise_e01.append(e01.ravel().astype(self.capacity_type))
+            self.pairwise_e10.append(e10.ravel().astype(self.capacity_type))
+            self.pairwise_e11.append(e11.ravel().astype(self.capacity_type))
         else:
             np.vectorize(self.graph.add_edge, otypes=[np.bool])(i, j, cap, rcap)
 
@@ -98,9 +107,9 @@ class BKBuilder(SLGBuilder):
         if self.graph is None:
             i, e0, e1 = np.broadcast_arrays(i, sink_cap, source_cap)
 
-            self.unary_nodes.append(i.flatten().astype(np.int32))
-            self.unary_e0.append(e0.flatten())
-            self.unary_e1.append(e1.flatten())
+            self.unary_nodes.append(i.ravel().astype(self.node_index_type))
+            self.unary_e0.append(e0.ravel().astype(self.capacity_type))
+            self.unary_e1.append(e1.ravel().astype(self.capacity_type))
         else:
             np.vectorize(self.graph.add_tweights, otypes=[np.bool])(i, source_cap, sink_cap)
 
