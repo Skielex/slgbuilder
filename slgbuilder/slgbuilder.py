@@ -229,7 +229,7 @@ class SLGBuilder(ABC):
                 np.abs(diff, out=diff)
                 np.subtract(value_range, diff, out=diff)
             else:
-                diff_mask = diff < 0
+                diff_mask = diff > 0
                 np.abs(diff, out=diff)
                 np.subtract(value_range, diff[diff_mask], out=diff[diff_mask])
                 diff[~diff_mask] = value_range
@@ -274,7 +274,7 @@ class SLGBuilder(ABC):
 
         def add_region_edges(g, b, nodeids):
 
-            b_mask = b < 0
+            b_mask = b > 0
             not_b_mask = ~b_mask
             np.abs(b, out=b)
 
