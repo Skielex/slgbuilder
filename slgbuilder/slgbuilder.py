@@ -215,42 +215,26 @@ class SLGBuilder(ABC):
                 self.add_pairwise_terms(i[r:r + step], j[r:r + step], e00[r:r + step], e01[r:r + step], e10[r:r + step],
                                         e11[r:r + step])
 
-    def add_boundary_cost(self, objects=None, sigma=None, symmetric=True):
+    def add_boundary_cost(self, objects=None, beta=1, symmetric=True):
         """Add boundary cost by adding edges between non-terminal nodes based on object data."""
 
         if objects is None:
             objects = self.objects
 
         # Calculates boundary penalties using.
-        def get_boundary_cost(diff):
-            if issubclass(self.capacity_type, np.integer):
-                diff = diff.astype(np.float)
-            else:
-                diff = diff.copy()
-
-            min_value = np.min(diff)
-            diff -= min_value
-            max_value = np.max(diff)
-            diff /= max_value
+        def get_boundary_cost(diff, value_range):
+            diff = diff.copy()
 
             if symmetric:
-                if sigma is None:
-                    diff = 1 - np.abs(diff)
-                else:
-                    diff = np.exp(-(diff**2) / (2 * sigma**2))
+                np.abs(diff, out=diff)
+                np.subtract(value_range, diff, out=diff)
             else:
-                diff_mask = diff > 0
-                if sigma is None:
-                    diff[diff_mask] = 1 - np.abs(diff[diff_mask])
-                else:
-                    diff[diff_mask] = np.exp(-(diff[diff_mask]**2) / (2 * sigma**2))
-                diff[~diff_mask] = 1
+                diff_mask = diff < 0
+                np.abs(diff, out=diff)
+                np.subtract(value_range, diff[diff_mask], out=diff[diff_mask])
+                diff[~diff_mask] = value_range
 
-            diff *= max_value
-            diff += min_value
-
-            if issubclass(self.capacity_type, np.integer):
-                diff = np.round(diff).astype(self.capacity_type)
+            diff *= beta
 
             return diff
 
@@ -258,6 +242,10 @@ class SLGBuilder(ABC):
             # Assume grid for now.
             # Get nodes for object in this graph.
             nodeids = self.get_nodeids(obj)
+
+            min_value = np.min(obj.data)
+            max_value = np.max(obj.data)
+            value_range = max_value - min_value
 
             for dim in range(nodeids.ndim):
 
@@ -269,8 +257,8 @@ class SLGBuilder(ABC):
                 diff = np.diff(data, axis=0)
 
                 # Calculate cost.
-                cost_f = get_boundary_cost(-diff)
-                cost_b = get_boundary_cost(diff)
+                cost_f = get_boundary_cost(-diff, value_range)
+                cost_b = get_boundary_cost(diff, value_range)
 
                 ids = np.moveaxis(nodeids, dim, 0)
                 ids = ids.reshape(ids.shape[0], -1)
@@ -278,7 +266,7 @@ class SLGBuilder(ABC):
                 # Add boundary terms (edges).
                 self.add_pairwise_terms(ids[:-1], ids[1:], 0, cost_f, cost_b, 0)
 
-    def add_region_cost(self, objects=None, alpha=0.1):
+    def add_region_cost(self, objects=None, alpha=1):
         """Add region cost by adding terminal edges with capacity based on the object data."""
 
         if objects is None:
@@ -286,9 +274,9 @@ class SLGBuilder(ABC):
 
         def add_region_edges(g, b, nodeids):
 
-            b_mask = b > 0
+            b_mask = b < 0
             not_b_mask = ~b_mask
-            b = np.abs(b)
+            np.abs(b, out=b)
 
             # Add unary terms (terminal edges).
             self.add_unary_terms(nodeids[b_mask], 0, b[b_mask])
@@ -299,10 +287,12 @@ class SLGBuilder(ABC):
             nodeids = self.get_nodeids(obj)
 
             # Get region cost.
-            b = obj.data
+            b = obj.data.astype(np.float)
             b -= np.min(b)
-            b /= np.max(b)
-            b = 2 * b - 1
+            b -= np.max(b) / 2
+            b *= 2 * alpha
+            if obj.data.dtype != np.float:
+                b = b.astype(obj.data.dtype)
 
             # Add region edges.
             add_region_edges(self.graph, b, nodeids)
