@@ -57,25 +57,26 @@ class BKBuilder(SLGBuilder):
             )
 
     def add_object(self, graph_object):
-        if graph_object in self.objects:
+        if graph_object in self.object_ids:
             # If object is already added, return its id.
-            return self.objects.index(graph_object)
+            return self.object_ids[graph_object]
 
         # Add object to graph.
         object_id = len(self.objects)
 
         if self.graph is None:
-            first_id = (np.min(self.nodes[-1]) + self.objects[-1].data.size) if self.objects else 0
+            first_id = (np.min(self.nodes[self.objects[-1]]) + self.objects[-1].data.size) if self.objects else 0
         else:
             first_id = self.graph.add_node(graph_object.data.size)
 
         self.objects.append(graph_object)
-        self.nodes.append(first_id)
+        self.object_ids[graph_object] = object_id
+        self.nodes[graph_object] = first_id
 
         return object_id
 
     def get_nodeids(self, graph_object):
-        nodeids = self.nodes[self.objects.index(graph_object)]
+        nodeids = self.nodes[graph_object]
 
         if np.isscalar(nodeids):
             return np.arange(nodeids, nodeids + graph_object.data.size).reshape(graph_object.data.shape)

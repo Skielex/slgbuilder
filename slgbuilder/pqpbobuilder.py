@@ -30,7 +30,7 @@ class PQPBOBuilder(SLGBuilder):
         )
 
     def _add_nodes(self, graph_object):
-        return self.graph.add_node(graph_object.data.size, self.objects.index(graph_object))
+        return self.graph.add_node(graph_object.data.size, self.object_ids[graph_object])
 
     def _test_types_and_set_inf_cap(self):
 
@@ -64,20 +64,21 @@ class PQPBOBuilder(SLGBuilder):
             self.graph.set_num_threads(self.num_threads)
 
     def add_object(self, graph_object):
-        if graph_object in self.objects:
+        if graph_object in self.object_ids:
             # If object is already added, return its id.
-            return self.objects.index(graph_object)
+            return self.object_ids[graph_object]
 
         # Add object to graph.
         object_id = len(self.objects)
 
         if self.jit_build:
-            first_id = (np.min(self.nodes[-1]) + self.objects[-1].data.size) if self.objects else 0
+            first_id = (np.min(self.nodes[self.objects[-1]]) + self.objects[-1].data.size) if self.objects else 0
         else:
             first_id = self._add_nodes(graph_object)
 
         self.objects.append(graph_object)
-        self.nodes.append(first_id)
+        self.object_ids[graph_object] = object_id
+        self.nodes[graph_object] = first_id
 
         return object_id
 

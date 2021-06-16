@@ -55,7 +55,8 @@ class SLGBuilder(ABC):
             self.create_graph_object()
 
         self.objects = []
-        self.nodes = []
+        self.object_ids = {}
+        self.nodes = {}
 
         # Create lists for terms.
         self.unary_nodes = []
@@ -88,7 +89,7 @@ class SLGBuilder(ABC):
         return [self.add_object(o) for o in graph_objects]
 
     def get_nodeids(self, graph_object):
-        nodeids = self.nodes[self.objects.index(graph_object)]
+        nodeids = self.nodes[graph_object]
         if np.isscalar(nodeids):
             return np.arange(nodeids, nodeids + graph_object.data.size).reshape(graph_object.data.shape)
         else:
@@ -827,7 +828,7 @@ class SLGBuilder(ABC):
 
         def prepare_sample_points(o):
             """Creates a tuple with data needed for worker."""
-            idx = self.objects.index(o)
+            idx = self.object_ids[o]
 
             points_raw = sample_points_dic.get(idx, None)
             if points_raw is None:
