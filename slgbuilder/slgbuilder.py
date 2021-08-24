@@ -463,13 +463,12 @@ class SLGBuilder(ABC):
 
     def add_layered_smoothness(self, objects=None, delta=1, wrap=True):
         """Add hard smoothness constraint to layered object. This function assumes an N-D regular grid."""
-
         if objects is None:
             objects = self.objects
 
         # Create delta per object if not supplied.
         if np.isscalar(delta):
-            delta = (delta * np.ones(len(objects))).astype(np.int)
+            delta = np.full(len(objects), delta)
 
         # Create wrap per object if not supplied.
         if np.isscalar(wrap):
@@ -523,7 +522,7 @@ class SLGBuilder(ABC):
                         self.add_pairwise_terms(ids[:, -1], ids[:, 0], 0, self.inf_cap, 0, 0)
                         self.add_pairwise_terms(ids[:, 0], ids[:, -1], 0, self.inf_cap, 0, 0)
 
-                else:
+                elif dx == round(dx):
                     # Add intercolumn edges (Eq3).
                     # Add pairwise terms.
                     self.add_pairwise_terms(ids[:-dx, :-1], ids[dx:, 1:], 0, self.inf_cap, 0, 0)
@@ -533,6 +532,27 @@ class SLGBuilder(ABC):
                         # Add pairwise wrapping terms (connecting first and last).
                         self.add_pairwise_terms(ids[:-dx, -1], ids[dx:, 0], 0, self.inf_cap, 0, 0)
                         self.add_pairwise_terms(ids[:-dx, 0], ids[dx:, -1], 0, self.inf_cap, 0, 0)
+
+                elif dx > 0 and dx < 1:
+                    # If smoothness is less than one, we interpret it as a factor, i.e.,
+                    # 1/2 = distance of two on the other axis.
+                    dy = round(1 / dx)
+
+                    # Add intercolumn edges (Eq3).
+                    # Add pairwise terms.
+                    if object_wrap[dim - 1]:
+                        # If we're wrapping, use roll to offset nodes.
+                        for y in range(1, dy):
+                            self.add_pairwise_terms(ids[:-1], np.roll(ids[1:], y, axis=1), 0, self.inf_cap, 0, 0)
+                            self.add_pairwise_terms(ids[:-1], np.roll(ids[1:], -y, axis=1), 0, self.inf_cap, 0, 0)
+                    else:
+                        # If we're not wrapping, slice to offset.
+                        for y in range(1, dy):
+                            self.add_pairwise_terms(ids[:-1, :-y], ids[1:, y:], 0, self.inf_cap, 0, 0)
+                            self.add_pairwise_terms(ids[:-1, y:], ids[1:, :-y], 0, self.inf_cap, 0, 0)
+
+                else:
+                    raise ValueError(f"Invalid delta value '{dx}'.")
 
     def add_layered_containment(self,
                                 outer_object,
