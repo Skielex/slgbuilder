@@ -522,7 +522,7 @@ class SLGBuilder(ABC):
                         self.add_pairwise_terms(ids[:, -1], ids[:, 0], 0, self.inf_cap, 0, 0)
                         self.add_pairwise_terms(ids[:, 0], ids[:, -1], 0, self.inf_cap, 0, 0)
 
-                elif dx == round(dx):
+                elif dx == int(dx):
                     # Add intercolumn edges (Eq3).
                     # Add pairwise terms.
                     self.add_pairwise_terms(ids[:-dx, :-1], ids[dx:, 1:], 0, self.inf_cap, 0, 0)
@@ -536,7 +536,7 @@ class SLGBuilder(ABC):
                 elif dx > 0 and dx < 1:
                     # If smoothness is less than one, we interpret it as a factor, i.e.,
                     # 1/2 = distance of two on the other axis.
-                    dy = round(1 / dx)
+                    dy = int(round(1 / dx))
 
                     # Add intercolumn edges (Eq3).
                     # Add pairwise terms.
