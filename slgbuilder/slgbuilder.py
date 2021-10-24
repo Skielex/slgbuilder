@@ -51,9 +51,6 @@ class SLGBuilder(ABC):
         self.node_index_type = np.dtype(node_index_type)
         self._test_types_and_set_inf_cap()
 
-        if not jit_build:
-            self.create_graph_object()
-
         self.objects = []
         self.nodes = []
 
@@ -67,6 +64,9 @@ class SLGBuilder(ABC):
         self.pairwise_e01 = []
         self.pairwise_e10 = []
         self.pairwise_e11 = []
+
+        if not jit_build:
+            self.create_graph_object()
 
     @abstractmethod
     def _add_nodes(self, object):

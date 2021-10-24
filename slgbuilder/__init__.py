@@ -4,6 +4,7 @@ from .qpbobuilder import QPBOBuilder
 from .mqpbobuilder import MQPBOBuilder
 from .pqpbobuilder import PQPBOBuilder
 from .mbkbuilder import MBKBuilder
+from .pbkbuilder import PBKBuilder
 
 try:
     from .orbuilder import ORBuilder

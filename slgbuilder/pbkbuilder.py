@@ -5,7 +5,7 @@ from .graphobject import GraphObject
 from .slgbuilder import SLGBuilder
 
 
-class MBKBuilder(SLGBuilder):
+class PBKBuilder(SLGBuilder):
     def __init__(
         self,
         estimated_nodes=0,
@@ -14,9 +14,11 @@ class MBKBuilder(SLGBuilder):
         arc_index_type=np.uint32,
         node_index_type=np.uint32,
         jit_build=True,
+        num_threads=-1,
     ):
         """TODO"""
         flow_type = np.int64 if np.issubdtype(capacity_type, np.integer) else np.float64
+        self.num_threads = num_threads
         self.merge_edges = False
         super().__init__(
             estimated_nodes=estimated_nodes,
@@ -29,12 +31,12 @@ class MBKBuilder(SLGBuilder):
         )
 
     def _add_nodes(self, graph_object):
-        return self.graph.add_node(graph_object.data.size)
+        return self.graph.add_node(graph_object.data.size, self.objects.index(graph_object))
 
     def _test_types_and_set_inf_cap(self):
 
         # Test if flow type is valid.
-        shrdr.bk(
+        shrdr.parallel_bk(
             capacity_type=self.capacity_type,
             arc_index_type=self.arc_index_type,
             node_index_type=self.node_index_type,
@@ -49,13 +51,17 @@ class MBKBuilder(SLGBuilder):
                 f"Invalid capacity type '{self.capacity_type}'. Supported types are: {', '.join(self.INF_CAP_MAP)}")
 
     def create_graph_object(self):
-        self.graph = shrdr.bk(
+        self.graph = shrdr.parallel_bk(
             self.estimated_nodes,
             self.estimated_edges,
+            expected_blocks=len(self.objects),
             capacity_type=self.capacity_type,
             arc_index_type=self.arc_index_type,
             node_index_type=self.node_index_type,
         )
+
+        if self.num_threads > 0:
+            self.graph.set_num_threads(self.num_threads)
 
     def add_object(self, graph_object):
         if graph_object in self.objects:
@@ -68,7 +74,7 @@ class MBKBuilder(SLGBuilder):
         if self.graph is None:
             first_id = (np.min(self.nodes[-1]) + self.objects[-1].data.size) if self.objects else 0
         else:
-            first_id = self.graph.add_node(graph_object.data.size)
+            first_id = self.graph.add_node(graph_object.data.size, len(self.objects))
 
         self.objects.append(graph_object)
         self.nodes.append(first_id)
@@ -117,9 +123,6 @@ class MBKBuilder(SLGBuilder):
         if isinstance(i, GraphObject):
             return self.what_segments(self.get_nodeids(i))
         return np.vectorize(self.graph.what_segment, otypes=[np.int8])(i)
-
-    def mark_nodes(self, i):
-        np.vectorize(self.graph.mark_node, otypes=[np.bool])(i)
 
     def solve(self):
         self.build_graph()
