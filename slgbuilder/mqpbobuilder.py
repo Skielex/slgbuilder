@@ -76,7 +76,7 @@ class MQPBOBuilder(SLGBuilder):
         return object_id
 
     def add_unary_terms(self, i, e0, e1):
-        i, e0, e1 = self.broadcast_unary_terms(i, e0, e1)
+        i, e0, e1 = self.broadcast_terms([i], [e0, e1])
 
         if self.graph is None:
             self.unary_nodes.append(i)
@@ -89,7 +89,7 @@ class MQPBOBuilder(SLGBuilder):
             self.graph.add_unary_terms(i, e0, e1)
 
     def add_pairwise_terms(self, i, j, e00, e01, e10, e11):
-        i, j, e00, e01, e10, e11 = self.broadcast_pairwise_terms(i, j, e00, e01, e10, e11)
+        i, j, e00, e01, e10, e11 = self.broadcast_terms([i, j], [e00, e01, e10, e11])
 
         if self.graph is None:
             self.pairwise_from.append(i)

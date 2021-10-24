@@ -111,24 +111,11 @@ class SLGBuilder(ABC):
     def solve(self):
         pass
 
-    def broadcast_unary_terms(self, i, e0, e1):
-        i = np.asarray(i, dtype=self.node_index_type)
-        e0 = np.asarray(e0, dtype=self.capacity_type)
-        e1 = np.asarray(e1, dtype=self.capacity_type)
-        i, e0, e1 = np.broadcast_arrays(i, e0, e1)
-        i, e0, e1 = i.ravel(), e0.ravel(), e1.ravel()
-        return i, e0, e1
-
-    def broadcast_pairwise_terms(self, i, j, e00, e01, e10, e11):
-        i = np.asarray(i, dtype=self.node_index_type)
-        j = np.asarray(j, dtype=self.node_index_type)
-        e00 = np.asarray(e00, dtype=self.capacity_type)
-        e01 = np.asarray(e01, dtype=self.capacity_type)
-        e10 = np.asarray(e10, dtype=self.capacity_type)
-        e11 = np.asarray(e11, dtype=self.capacity_type)
-        i, j, e00, e01, e10, e11 = np.broadcast_arrays(i, j, e00, e01, e10, e11)
-        i, j, e00, e01, e10, e11 = i.ravel(), j.ravel(), e00.ravel(), e01.ravel(), e10.ravel(), e11.ravel()
-        return i, j, e00, e01, e10, e11
+    def broadcast_terms(self, indices, energies):
+        arrays = [np.asarray(a, dtype=self.node_index_type) for a in indices]
+        arrays += [np.asarray(a, dtype=self.capacity_type) for a in energies]
+        arrays = np.broadcast_arrays(*arrays)
+        return [a.ravel() for a in arrays]
 
     def build_graph(self, sort_pairwise_terms=False):
 
@@ -181,10 +168,10 @@ class SLGBuilder(ABC):
             i = np.concatenate(self.pairwise_from)
             j = np.concatenate(self.pairwise_to)
 
-            e00 = np.concatenate(self.pairwise_e00)
+            e00 = np.concatenate(self.pairwise_e00) if self.pairwise_e00 else None
             e01 = np.concatenate(self.pairwise_e01)
             e10 = np.concatenate(self.pairwise_e10)
-            e11 = np.concatenate(self.pairwise_e11)
+            e11 = np.concatenate(self.pairwise_e11) if self.pairwise_e11 else None
 
             # No longer needed.
             self.pairwise_from.clear()
@@ -201,10 +188,12 @@ class SLGBuilder(ABC):
                 # Sorted edges.
                 i = i[sort_indices]
                 j = j[sort_indices]
-                e00 = e00[sort_indices]
+                if e00:
+                    e00 = e00[sort_indices]
                 e01 = e01[sort_indices]
                 e10 = e10[sort_indices]
-                e11 = e11[sort_indices]
+                if e11:
+                    e11 = e11[sort_indices]
 
             # GC before adding edges.
             gc.collect()
@@ -212,8 +201,14 @@ class SLGBuilder(ABC):
             # Add edges to graph.
             step = 100000
             for r in range(0, i.size, step):
-                self.add_pairwise_terms(i[r:r + step], j[r:r + step], e00[r:r + step], e01[r:r + step], e10[r:r + step],
-                                        e11[r:r + step])
+                self.add_pairwise_terms(
+                    i[r:r + step],
+                    j[r:r + step],
+                    e00[r:r + step] if e00 is not None else e00,
+                    e01[r:r + step],
+                    e10[r:r + step],
+                    e11[r:r + step] if e11 is not None else e11,
+                )
 
     def add_boundary_cost(self, objects=None, beta=1, symmetric=True):
         """Add boundary cost by adding edges between non-terminal nodes based on object data."""
