@@ -126,4 +126,6 @@ class PBKBuilder(SLGBuilder):
 
     def solve(self):
         self.build_graph()
-        return self.graph.maxflow()
+        flow = self.graph.maxflow()
+        self.solve_count += 1
+        return flow

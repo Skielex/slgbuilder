@@ -11,8 +11,8 @@ class MQPBOBuilder(SLGBuilder):
         estimated_nodes=0,
         estimated_edges=0,
         capacity_type=np.int32,
-        arc_index_type=np.uint32,
-        node_index_type=np.uint32,
+        arc_index_type=np.int32,
+        node_index_type=np.int32,
         jit_build=True,
     ):
         """TODO"""
@@ -86,6 +86,8 @@ class MQPBOBuilder(SLGBuilder):
             i = np.ascontiguousarray(i)
             e0 = np.ascontiguousarray(e0)
             e1 = np.ascontiguousarray(e1)
+            if self.solve_count > 0:
+                self.graph.mark_nodes(i)
             self.graph.add_unary_terms(i, e0, e1)
 
     def add_pairwise_terms(self, i, j, e00, e01, e10, e11):
@@ -105,6 +107,9 @@ class MQPBOBuilder(SLGBuilder):
             e01 = np.ascontiguousarray(e01)
             e10 = np.ascontiguousarray(e10)
             e11 = np.ascontiguousarray(e11)
+            if self.solve_count > 0:
+                self.graph.mark_nodes(i)
+                self.graph.mark_nodes(j)
             self.graph.add_pairwise_terms(i, j, e00, e01, e10, e11)
 
     def get_labels(self, i):
@@ -112,9 +117,10 @@ class MQPBOBuilder(SLGBuilder):
             return self.get_labels(self.get_nodeids(i))
         return np.vectorize(self.graph.get_label, otypes=[np.int8])(i)
 
-    def solve(self, compute_weak_persistencies=True):
+    def solve(self, compute_weak_persistencies=True, reuse_trees=True):
         self.build_graph()
-        self.graph.solve()
+        flow = self.graph.solve(reuse_trees and self.solve_count > 0)
         if compute_weak_persistencies:
             self.graph.compute_weak_persistencies()
-        return self.graph.compute_twice_energy()
+        self.solve_count += 1
+        return flow

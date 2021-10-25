@@ -43,6 +43,8 @@ class SLGBuilder(ABC):
         self.jit_build = jit_build
 
         self.graph = None
+        self.solve_count = 0
+        self.mark_changed_nodes = True
 
         self.inf_cap = None
         self.flow_type = np.dtype(flow_type)

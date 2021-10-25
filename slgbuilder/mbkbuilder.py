@@ -89,6 +89,8 @@ class MBKBuilder(SLGBuilder):
             i = np.ascontiguousarray(i)
             e0 = np.ascontiguousarray(e0)
             e1 = np.ascontiguousarray(e1)
+            if self.solve_count > 0:
+                self.graph.mark_nodes(i)
             self.graph.add_tweights(i, e1, e0)
 
     def add_edges(self, i, j, cap, rcap):
@@ -108,6 +110,9 @@ class MBKBuilder(SLGBuilder):
             j = np.ascontiguousarray(j)
             e01 = np.ascontiguousarray(e01)
             e10 = np.ascontiguousarray(e10)
+            if self.solve_count > 0:
+                self.graph.mark_nodes(i)
+                self.graph.mark_nodes(j)
             self.graph.add_edges(i, j, e01, e10, self.merge_edges)
 
     def get_labels(self, i):
@@ -121,6 +126,8 @@ class MBKBuilder(SLGBuilder):
     def mark_nodes(self, i):
         np.vectorize(self.graph.mark_node, otypes=[np.bool])(i)
 
-    def solve(self):
+    def solve(self, reuse_trees=True):
         self.build_graph()
-        return self.graph.maxflow()
+        flow = self.graph.maxflow(reuse_trees and self.solve_count > 0)
+        self.solve_count += 1
+        return flow
