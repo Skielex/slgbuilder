@@ -74,15 +74,6 @@ class BKBuilder(SLGBuilder):
 
         return object_id
 
-    def get_nodeids(self, graph_object):
-        nodeids = self.nodes[self.objects.index(graph_object)]
-
-        if np.isscalar(nodeids):
-            return np.arange(nodeids, nodeids + graph_object.data.size).reshape(graph_object.data.shape)
-        else:
-            # It is an array.
-            return nodeids
-
     def add_pairwise_terms(self, i, j, e00, e01, e10, e11):
         # TODO: Warn that e00 and e11 are ignores.
         self.add_edges(i, j, e01, e10)
