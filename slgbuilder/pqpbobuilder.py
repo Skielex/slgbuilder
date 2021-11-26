@@ -10,6 +10,8 @@ class PQPBOBuilder(SLGBuilder):
         self,
         estimated_nodes=0,
         estimated_edges=0,
+        expected_blocks=0,
+        expect_nonsubmodular=True,
         capacity_type=np.int32,
         arc_index_type=np.uint32,
         node_index_type=np.uint32,
@@ -19,6 +21,8 @@ class PQPBOBuilder(SLGBuilder):
         """TODO"""
         flow_type = np.int64 if np.issubdtype(capacity_type, np.integer) else np.float64
         self.num_threads = num_threads
+        self.expected_blocks = expected_blocks
+        self.expect_nonsubmodular = expect_nonsubmodular,
         super().__init__(
             estimated_nodes=estimated_nodes,
             estimated_edges=estimated_edges,
@@ -30,7 +34,24 @@ class PQPBOBuilder(SLGBuilder):
         )
 
     def _add_nodes(self, graph_object):
-        return self.graph.add_node(graph_object.data.size, self.objects.index(graph_object))
+        if graph_object.block_ids is not None:
+            if graph_object.data.shape != graph_object.block_ids.shape:
+                raise ValueError('Shapes of object data %s and block_ids %s do not match.' % (graph_object.data.shape, graph_object.block_ids.shape))
+
+            block_ids_flat = graph_object.block_ids.ravel()
+            change_indices = np.nonzero(np.diff(block_ids_flat))[0]
+            change_indices += 1
+            change_indices = np.concatenate([[0], change_indices])
+            change_counts = np.diff(change_indices)
+            change_counts = np.concatenate([change_counts, [block_ids_flat.size - change_indices[-1]]])
+            change_block_ids = block_ids_flat[change_indices]
+
+            add_node_fn = np.vectorize(self.graph.add_node, otypes=[self.node_index_type])
+            first_node_id = add_node_fn(change_counts, change_block_ids)[0]
+        else:
+            first_node_id = self.graph.add_node(graph_object.data.size, self.objects.index(graph_object))
+
+        return first_node_id
 
     def _test_types_and_set_inf_cap(self):
 
@@ -46,15 +67,20 @@ class PQPBOBuilder(SLGBuilder):
 
         # Check if a value was found.
         if self.inf_cap is None:
-            raise ValueError(
-                f"Invalid capacity type '{self.capacity_type}'. Supported types are: {', '.join(self.INF_CAP_MAP)}")
+            raise ValueError(f"Invalid capacity type '{self.capacity_type}'. Supported types are: {', '.join(self.INF_CAP_MAP)}")
 
     def create_graph_object(self):
+        if self.expected_blocks == 0:
+            object_max_block_ids = [np.max(go.block_ids) for go in self.objects if go.block_ids is not None]
+            if len(object_max_block_ids) != len(self.objects):
+                raise ValueError("Some objects are missing block_ids. Either all graph objects should have block_ids set or none of them should.")
+            self.expected_blocks = max(object_max_block_ids) + 1 if object_max_block_ids else len(self.objects)
+
         self.graph = shrdr.parallel_qpbo(
             self.estimated_nodes,
             self.estimated_edges,
-            expect_nonsubmodular=True,
-            expected_blocks=len(self.objects),
+            expect_nonsubmodular=self.expect_nonsubmodular,
+            expected_blocks=self.expected_blocks,
             capacity_type=self.capacity_type,
             arc_index_type=self.arc_index_type,
             node_index_type=self.node_index_type,
@@ -74,7 +100,7 @@ class PQPBOBuilder(SLGBuilder):
         if self.jit_build:
             first_id = (np.min(self.nodes[-1]) + self.objects[-1].data.size) if self.objects else 0
         else:
-            first_id = self._add_nodes(graph_object, len(self.objects))
+            first_id = self._add_nodes(graph_object)
 
         self.objects.append(graph_object)
         self.nodes.append(first_id)
@@ -124,4 +150,4 @@ class PQPBOBuilder(SLGBuilder):
         self.solved = True
         if compute_weak_persistencies:
             self.graph.compute_weak_persistencies()
-        return self.graph.compute_twice_energy()
+        return self.graph.get_flow()
