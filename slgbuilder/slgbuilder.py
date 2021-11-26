@@ -404,7 +404,7 @@ class SLGBuilder(ABC):
                 # Add pairwise terms (edges) between neighbors.
                 self.add_pairwise_terms(ids[:-1], ids[1:], 0, beta, beta, 0)
 
-    def add_layered_boundary_cost(self, objects=None):
+    def add_layered_boundary_cost(self, objects=None, axis=0):
         """Add layered boundary cost. This function assumes an N-D regular grid."""
 
         if objects is None:
@@ -416,9 +416,12 @@ class SLGBuilder(ABC):
 
             # Calculate weights (Eq1).
             # Prevent empty solution (sec 4.1).
-            w = np.zeros(obj.data.shape, dtype=self.capacity_type)
+            w = np.moveaxis(np.zeros(obj.data.shape, dtype=self.capacity_type), axis, 0)
             w[0] = -self.inf_cap
-            w[1:] = np.diff(obj.data, axis=0)
+            w[1:] = np.diff(np.moveaxis(obj.data, axis, 0), axis=0)
+
+            # Move primary axis first.
+            nodeids = np.moveaxis(nodeids, axis, 0)
 
             # Add intracolumn edges (Eq2).
             self.add_pairwise_terms(nodeids[:-1], nodeids[1:], 0, self.inf_cap, 0, 0)
@@ -434,14 +437,14 @@ class SLGBuilder(ABC):
             # Add unary terms (terminal edges).
             self.add_unary_terms(nodeids, e0, e1)
 
-    def add_layered_region_cost(self, graph_object, outer_region_cost, inner_region_cost):
+    def add_layered_region_cost(self, graph_object, outer_region_cost, inner_region_cost, axis=0):
         """Add layered region cost. This function assumes an N-D regular grid."""
 
         # Get nodes for object in this graph.
-        nodeids = self.get_nodeids(graph_object)
+        nodeids = np.moveaxis(self.get_nodeids(graph_object), axis, 0)
 
         # Calculate weights.
-        w = inner_region_cost - outer_region_cost
+        w = np.moveaxis(inner_region_cost - outer_region_cost, axis, 0)
         # Prevent empty solution.
         w[0] = -self.inf_cap
 
@@ -456,7 +459,7 @@ class SLGBuilder(ABC):
         # Add terminal edges.
         self.add_unary_terms(nodeids, e0, e1)
 
-    def add_layered_smoothness(self, objects=None, delta=1, wrap=True):
+    def add_layered_smoothness(self, objects=None, delta=1, wrap=True, axis=0):
         """Add hard smoothness constraint to layered object. This function assumes an N-D regular grid."""
         if objects is None:
             objects = self.objects
@@ -473,6 +476,9 @@ class SLGBuilder(ABC):
 
             # Get nodes for object in this graph.
             nodeids = self.get_nodeids(obj)
+
+            # Move primary axis first.
+            nodeids = np.moveaxis(nodeids, axis, 0)
 
             if nodeids.shape[0] <= 1:
                 # If the first axis is 0 or 1, skip object.
@@ -549,7 +555,7 @@ class SLGBuilder(ABC):
                 else:
                     raise ValueError(f"Invalid delta value '{dx}'.")
 
-    def add_layered_containment(self, outer_object, inner_object, min_margin=0, max_margin=None, distance_metric='l2', reduce_redundancy=True):
+    def add_layered_containment(self, outer_object, inner_object, min_margin=0, max_margin=None, distance_metric='l2', reduce_redundancy=True, axis=0):
         """Add layered containment."""
 
         if outer_object == inner_object:
@@ -562,6 +568,12 @@ class SLGBuilder(ABC):
         # Get points.
         outer_points = outer_object.sample_points
         inner_points = inner_object.sample_points
+
+        # Move axes.
+        outer_nodeids = np.moveaxis(outer_nodeids, axis, 0)
+        inner_nodeids = np.moveaxis(inner_nodeids, axis, 0)
+        outer_points = np.moveaxis(outer_points, axis if axis >= 0 else axis - 1, 0)
+        inner_points = np.moveaxis(inner_points, axis if axis >= 0 else axis - 1, 0)
 
         if outer_points.ndim != inner_points.ndim or outer_points.shape[-1] != inner_points.shape[-1]:
             raise ValueError('outer_object points and inner_object points must have the same number of dimensions and the same size last dimension.')
@@ -720,7 +732,7 @@ class SLGBuilder(ABC):
                     # Add containment edges.
                     self.add_pairwise_terms(outer_ids, inner_ids, 0, self.inf_cap, 0, 0)
 
-    def add_layered_exclusion(self, object_1, object_2, margin=1, distance_metric='l1', reduce_redundancy=True):
+    def add_layered_exclusion(self, object_1, object_2, margin=1, distance_metric='l1', reduce_redundancy=True, axis=0):
         """Add exclsion constraint edges forcing object_1 and object_2 not to overlap.
         This function assumes a layered boundary cost has been applied to the objects.
         """
@@ -735,6 +747,12 @@ class SLGBuilder(ABC):
         # Get points.
         object_1_points = object_1.sample_points
         object_2_points = object_2.sample_points
+
+        # Move axes.
+        object_1_nodeids = np.moveaxis(object_1_nodeids, axis, 0)
+        object_2_nodeids = np.moveaxis(object_2_nodeids, axis, 0)
+        object_1_points = np.moveaxis(object_1_points, axis if axis >= 0 else axis - 1, 0)
+        object_2_points = np.moveaxis(object_2_points, axis if axis >= 0 else axis - 1, 0)
 
         # Create nearest neighbors tree.
         neigh = NearestNeighbors(radius=margin, metric=distance_metric)
