@@ -1,10 +1,21 @@
 from .bkbuilder import BKBuilder as MaxflowBuilder
 from .graphobject import GraphObject
 from .qpbobuilder import QPBOBuilder
-from .mqpbobuilder import MQPBOBuilder
-from .pqpbobuilder import PQPBOBuilder
-from .mbkbuilder import MBKBuilder
-from .pbkbuilder import PBKBuilder
+
+try:
+    from .mqpbobuilder import MQPBOBuilder
+    from .pqpbobuilder import PQPBOBuilder
+    from .mbkbuilder import MBKBuilder
+    from .pbkbuilder import PBKBuilder
+except ModuleNotFoundError:
+    # shrdr not found. Modules will not be available.F
+    pass
+
+try:
+    from .hpfbuilder import HPFBuilder
+except ModuleNotFoundError:
+    # thinhpf not found. HPFBuilder will not be available.
+    pass
 
 try:
     from .orbuilder import ORBuilder
