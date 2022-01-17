@@ -95,7 +95,7 @@ class PBKBuilder(SLGBuilder):
         # Add object to graph.
         object_id = len(self.objects)
 
-        if self.jit_build:
+        if self.graph is None:
             first_id = (np.min(self.nodes[-1]) + self.objects[-1].data.size) if self.objects else 0
         else:
             first_id = self._add_nodes(graph_object)
