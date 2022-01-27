@@ -524,6 +524,7 @@ class SLGBuilder(ABC):
                         self.add_pairwise_terms(ids[:, 0], ids[:, -1], 0, self.inf_cap, 0, 0)
 
                 elif dx == int(dx):
+                    dx = int(dx)
                     # Add intercolumn edges (Eq3).
                     # Add pairwise terms.
                     self.add_pairwise_terms(ids[:-dx, :-1], ids[dx:, 1:], 0, self.inf_cap, 0, 0)
