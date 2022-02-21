@@ -472,7 +472,7 @@ class SLGBuilder(ABC):
         # Add terminal edges.
         self.add_unary_terms(nodeids, e0, e1)
 
-    def add_layered_smoothness(self, objects=None, delta=1, wrap=True, axis=0):
+    def add_layered_smoothness(self, objects=None, delta=1, wrap=True, axis=0, where=None):
         """Add hard smoothness constraint to layered object. This function assumes an N-D regular grid."""
         if objects is None:
             objects = self.objects
@@ -492,6 +492,10 @@ class SLGBuilder(ABC):
 
             # Move primary axis first.
             nodeids = np.moveaxis(nodeids, axis, 0)
+
+            if where is not None:
+                # If the where argument is set, select nodes accordingly.
+                nodeids = nodeids[:, where]
 
             if nodeids.shape[0] <= 1:
                 # If the first axis is 0 or 1, skip object.
@@ -569,7 +573,7 @@ class SLGBuilder(ABC):
                 else:
                     raise ValueError(f"Invalid delta value '{dx}'.")
 
-    def add_layered_containment(self, outer_object, inner_object, min_margin=0, max_margin=None, distance_metric='l2', reduce_redundancy=True, axis=0):
+    def add_layered_containment(self, outer_object, inner_object, min_margin=0, max_margin=None, distance_metric='l2', reduce_redundancy=True, axis=0, where=None):
         """Add layered containment."""
 
         if outer_object == inner_object:
@@ -588,6 +592,13 @@ class SLGBuilder(ABC):
         inner_nodeids = np.moveaxis(inner_nodeids, axis, 0)
         outer_points = np.moveaxis(outer_points, axis if axis >= 0 else axis - 1, 0)
         inner_points = np.moveaxis(inner_points, axis if axis >= 0 else axis - 1, 0)
+
+        if where is not None:
+            # If the where argument is set, select points and nodes accordingly.
+            outer_nodeids = outer_nodeids[:, where]
+            inner_nodeids = inner_nodeids[:, where]
+            outer_points = outer_points[:, where]
+            inner_points = inner_points[:, where]
 
         if outer_points.ndim != inner_points.ndim or outer_points.shape[-1] != inner_points.shape[-1]:
             raise ValueError('outer_object points and inner_object points must have the same number of dimensions and the same size last dimension.')
