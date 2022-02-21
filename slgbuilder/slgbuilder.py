@@ -46,6 +46,15 @@ class SLGBuilder(ABC):
         self.solve_count = 0
         self.mark_changed_nodes = True
 
+        # Caching node ids list by default is probably a good idea.
+        # 1. Creating a new list takes some time and may be very expensive in
+        # cases where get_nodeids is called many time, such as when using
+        # `where` parameter.
+        # 2. Not caching could reduce memory use in some cases, however,
+        # it could also increase memory usage as new arrays are created
+        # and sliced instead of slicing the same array each time.
+        self.cache_nodeids = True
+
         self.inf_cap = None
         self.flow_type = np.dtype(flow_type)
         self.capacity_type = np.dtype(capacity_type)
@@ -90,9 +99,13 @@ class SLGBuilder(ABC):
         return [self.add_object(o) for o in graph_objects]
 
     def get_nodeids(self, graph_object):
-        nodeids = self.nodes[self.objects.index(graph_object)]
+        object_index = self.objects.index(graph_object)
+        nodeids = self.nodes[object_index]
         if np.isscalar(nodeids):
-            return np.arange(nodeids, nodeids + graph_object.data.size).reshape(graph_object.data.shape)
+            nodeids = np.arange(nodeids, nodeids + graph_object.data.size).reshape(graph_object.data.shape)
+            if self.cache_nodeids:
+                self.nodes[object_index] = nodeids
+            return nodeids
         else:
             # It is an array.
             return nodeids
