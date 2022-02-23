@@ -198,16 +198,16 @@ class SLGBuilder(ABC):
 
             if sort_pairwise_terms:
                 # Sort.
-                sort_indices = np.lexsort((-i, -j))
+                sort_indices = np.lexsort((i, j))[::-1]
 
                 # Sorted edges.
                 i = i[sort_indices]
                 j = j[sort_indices]
-                if e00.size == sort_indices.size:
+                if e00 is not None:
                     e00 = e00[sort_indices]
                 e01 = e01[sort_indices]
                 e10 = e10[sort_indices]
-                if e11.size == sort_indices.size:
+                if e11 is not None:
                     e11 = e11[sort_indices]
 
             # GC before adding edges.
