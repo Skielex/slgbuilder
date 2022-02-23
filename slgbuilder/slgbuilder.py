@@ -198,6 +198,7 @@ class SLGBuilder(ABC):
 
             if sort_pairwise_terms:
                 # Sort.
+                # The reverse sort appears to perform best for BK Maxflow.
                 sort_indices = np.lexsort((i, j))[::-1]
 
                 # Sorted edges.
