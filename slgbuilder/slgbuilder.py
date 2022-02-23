@@ -203,11 +203,11 @@ class SLGBuilder(ABC):
                 # Sorted edges.
                 i = i[sort_indices]
                 j = j[sort_indices]
-                if e00:
+                if e00.size == sort_indices.size:
                     e00 = e00[sort_indices]
                 e01 = e01[sort_indices]
                 e10 = e10[sort_indices]
-                if e11:
+                if e11.size == sort_indices.size:
                     e11 = e11[sort_indices]
 
             # GC before adding edges.
