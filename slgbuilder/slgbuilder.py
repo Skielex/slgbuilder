@@ -623,6 +623,10 @@ class SLGBuilder(ABC):
                 else:
                     self.add_pairwise_terms(outer_nodeids[min_margin:], inner_nodeids[:-min_margin], 0, self.inf_cap, 0, 0)
                     self.add_pairwise_terms(outer_nodeids[:min_margin], inner_nodeids[0], 0, self.inf_cap, 0, 0)
+                    # Force inner object away from the outer when the outer is near the data boundary.
+                    # Without this minimum distance is not properly enforced for a solution
+                    # where the the cut is found for inner_nodeids[-min_margin:].
+                    self.add_unary_terms(inner_nodeids[-min_margin:], 0, self.inf_cap)
 
         # Else we need to find nodes to connect.
         else:
