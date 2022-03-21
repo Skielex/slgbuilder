@@ -562,12 +562,12 @@ class SLGBuilder(ABC):
                     # Add pairwise terms.
                     if object_wrap[dim - 1]:
                         # If we're wrapping, use roll to offset nodes.
-                        for y in range(1, dy):
+                        for y in range(1, dy + 1):
                             self.add_pairwise_terms(ids[:-1], np.roll(ids[1:], y, axis=1), 0, self.inf_cap, 0, 0)
                             self.add_pairwise_terms(ids[:-1], np.roll(ids[1:], -y, axis=1), 0, self.inf_cap, 0, 0)
                     else:
                         # If we're not wrapping, slice to offset.
-                        for y in range(1, dy):
+                        for y in range(1, dy + 1):
                             self.add_pairwise_terms(ids[:-1, :-y], ids[1:, y:], 0, self.inf_cap, 0, 0)
                             self.add_pairwise_terms(ids[:-1, y:], ids[1:, :-y], 0, self.inf_cap, 0, 0)
 
