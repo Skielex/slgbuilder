@@ -28,6 +28,7 @@ setup(
     ],
     install_requires=["numpy", "scipy", "scikit-learn", "thinmaxflow", "thinqpbo"],
     extra_require={
+        "all": ["thinhpf", "ortools"],
         "ortools": ["ortools"],
         "thinhpf": ["thinhpf"],
     },
