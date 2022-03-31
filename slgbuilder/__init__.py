@@ -8,7 +8,7 @@ try:
     from .mbkbuilder import MBKBuilder
     from .pbkbuilder import PBKBuilder
 except ModuleNotFoundError:
-    # shrdr not found. Modules will not be available.F
+    # shrdr not found. Modules will not be available.
     pass
 
 try:
