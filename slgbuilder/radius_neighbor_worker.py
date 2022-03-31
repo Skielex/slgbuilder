@@ -27,8 +27,10 @@ def radius_neighbor_worker(idx_pair):
     idx_1, idx_2 = idx_pair
     object_1_points_shape = sample_points_shape_dic[idx_1]
     object_2_points_shape = sample_points_shape_dic[idx_2]
-    object_1_points = np.frombuffer(sample_points_dic[idx_1], dtype=sample_points_dtype_dic[idx_1]).reshape(object_1_points_shape)
-    object_2_points = np.frombuffer(sample_points_dic[idx_2], dtype=sample_points_dtype_dic[idx_2]).reshape(object_2_points_shape)
+    object_1_points = np.frombuffer(sample_points_dic[idx_1],
+                                    dtype=sample_points_dtype_dic[idx_1]).reshape(object_1_points_shape)
+    object_2_points = np.frombuffer(sample_points_dic[idx_2],
+                                    dtype=sample_points_dtype_dic[idx_2]).reshape(object_2_points_shape)
 
     # Check cache for neigh.
     neigh = neigh_cache.get(idx_1, None)

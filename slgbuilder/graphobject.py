@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class GraphObject:
     def __init__(self, data, sample_points=None, block_ids=None):
         """Creates a GraphObject for storing data and data points.
@@ -11,7 +12,8 @@ class GraphObject:
             sample_points = np.moveaxis(np.indices(data.shape), 0, -1)
 
         if data.shape != sample_points.shape[:-1]:
-            raise ValueError('Shapes of object %s and sample_points %s do not match.' % (data.shape, sample_points.shape[:-1]))
+            raise ValueError('Shapes of object %s and sample_points %s do not match.' %
+                             (data.shape, sample_points.shape[:-1]))
 
         self.sample_points = sample_points
 

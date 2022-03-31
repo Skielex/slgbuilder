@@ -35,7 +35,8 @@ class PBKBuilder(SLGBuilder):
     def _add_nodes(self, graph_object):
         if graph_object.block_ids is not None:
             if graph_object.data.shape != graph_object.block_ids.shape:
-                raise ValueError('Shapes of object data %s and block_ids %s do not match.' % (graph_object.data.shape, graph_object.block_ids.shape))
+                raise ValueError('Shapes of object data %s and block_ids %s do not match.' %
+                                 (graph_object.data.shape, graph_object.block_ids.shape))
 
             block_ids_flat = graph_object.block_ids.ravel()
             change_indices = np.nonzero(np.diff(block_ids_flat))[0]
@@ -66,13 +67,16 @@ class PBKBuilder(SLGBuilder):
 
         # Check if a value was found.
         if self.inf_cap is None:
-            raise ValueError(f"Invalid capacity type '{self.capacity_type}'. Supported types are: {', '.join(self.INF_CAP_MAP)}")
+            raise ValueError(
+                f"Invalid capacity type '{self.capacity_type}'. Supported types are: {', '.join(self.INF_CAP_MAP)}")
 
     def create_graph_object(self):
         if self.expected_blocks == 0:
             object_max_block_ids = [np.max(go.block_ids) for go in self.objects if go.block_ids is not None]
             if len(object_max_block_ids) != len(self.objects):
-                raise ValueError("Some objects are missing block_ids. Either all graph objects should have block_ids set or none of them should.")
+                raise ValueError(
+                    "Some objects are missing block_ids. Either all graph objects should have block_ids set or none of them should."
+                )
             self.expected_blocks = max(object_max_block_ids) + 1 if object_max_block_ids else len(self.objects)
 
         self.graph = shrdr.parallel_bk(

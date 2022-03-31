@@ -6,7 +6,6 @@ import numpy as np
 from scipy import sparse
 from sklearn.neighbors import NearestNeighbors
 
-from .graphobject import GraphObject
 from .radius_neighbor_worker import init_radius_neighbor_worker, radius_neighbor_worker
 
 
@@ -362,7 +361,8 @@ class SLGBuilder(ABC):
         object_2_points = object_2.sample_points
 
         # TODO Avoid searching for neigbours if possible.
-        if margin == 0 and object_1_points.shape == object_2_points.shape and np.all(object_1_points == object_2_points):
+        if margin == 0 and object_1_points.shape == object_2_points.shape and np.all(
+                object_1_points == object_2_points):
             # Add containment edges.
             self.add_pairwise_terms(object_1_nodeids, object_2_nodeids, 0, 0, 0, self.inf_cap)
         else:
@@ -372,7 +372,8 @@ class SLGBuilder(ABC):
 
             # Create neighbors graph.
             # Get connectivity for all within margin.
-            radius_neighbors_graph = neigh.radius_neighbors_graph(object_2_points.reshape(-1, object_2_points.shape[-1]))
+            radius_neighbors_graph = neigh.radius_neighbors_graph(object_2_points.reshape(
+                -1, object_2_points.shape[-1]))
 
             # Get indices for all combined graph connections.
             indices_2, indices_1, _ = sparse.find(radius_neighbors_graph)
@@ -574,7 +575,15 @@ class SLGBuilder(ABC):
                 else:
                     raise ValueError(f"Invalid delta value '{dx}'.")
 
-    def add_layered_containment(self, outer_object, inner_object, min_margin=0, max_margin=None, distance_metric='l2', reduce_redundancy=True, axis=0, where=None):
+    def add_layered_containment(self,
+                                outer_object,
+                                inner_object,
+                                min_margin=0,
+                                max_margin=None,
+                                distance_metric='l2',
+                                reduce_redundancy=True,
+                                axis=0,
+                                where=None):
         """Add layered containment."""
 
         if outer_object == inner_object:
@@ -602,7 +611,9 @@ class SLGBuilder(ABC):
             inner_points = inner_points[:, where]
 
         if outer_points.ndim != inner_points.ndim or outer_points.shape[-1] != inner_points.shape[-1]:
-            raise ValueError('outer_object points and inner_object points must have the same number of dimensions and the same size last dimension.')
+            raise ValueError(
+                'outer_object points and inner_object points must have the same number of dimensions and the same size last dimension.'
+            )
 
         # Check if the points are identical.
         if outer_points.shape == inner_points.shape and np.all(outer_points == inner_points):
@@ -613,7 +624,8 @@ class SLGBuilder(ABC):
                 if max_margin == 0:
                     self.add_pairwise_terms(inner_nodeids, outer_nodeids, 0, self.inf_cap, 0, 0)
                 else:
-                    self.add_pairwise_terms(inner_nodeids[:-max_margin], outer_nodeids[max_margin:], 0, self.inf_cap, 0, 0)
+                    self.add_pairwise_terms(inner_nodeids[:-max_margin], outer_nodeids[max_margin:], 0, self.inf_cap, 0,
+                                            0)
                     self.add_pairwise_terms(inner_nodeids[-max_margin:], outer_nodeids[-1], 0, self.inf_cap, 0, 0)
 
             if min_margin is not None and outer_nodeids.shape[0] > min_margin:
@@ -621,7 +633,8 @@ class SLGBuilder(ABC):
                 if min_margin == 0:
                     self.add_pairwise_terms(outer_nodeids, inner_nodeids, 0, self.inf_cap, 0, 0)
                 else:
-                    self.add_pairwise_terms(outer_nodeids[min_margin:], inner_nodeids[:-min_margin], 0, self.inf_cap, 0, 0)
+                    self.add_pairwise_terms(outer_nodeids[min_margin:], inner_nodeids[:-min_margin], 0, self.inf_cap, 0,
+                                            0)
                     self.add_pairwise_terms(outer_nodeids[:min_margin], inner_nodeids[0], 0, self.inf_cap, 0, 0)
                     # Force inner object away from the outer when the outer is near the data boundary.
                     # Without this minimum distance is not properly enforced for a solution
@@ -656,7 +669,9 @@ class SLGBuilder(ABC):
                 inner_points_moved_flat = inner_points_moved.reshape(-1, outer_points.shape[-1])
 
                 # Find the 4 nearest neighbours for moved points. This should be enough.
-                radius_neighbors_graph = neigh.kneighbors_graph(inner_points_moved_flat, n_neighbors=4, mode='connectivity')
+                radius_neighbors_graph = neigh.kneighbors_graph(inner_points_moved_flat,
+                                                                n_neighbors=4,
+                                                                mode='connectivity')
 
                 # Get indices for all combined graph connections.
                 inner_indices, outer_indices, _ = sparse.find(radius_neighbors_graph)
@@ -665,7 +680,8 @@ class SLGBuilder(ABC):
 
                     # Find distances between neighbours.
                     # Create mask for neighbours futher than max margin away.
-                    distance_mask = np.sum((outer_points_flat[outer_indices] - inner_points_flat[inner_indices])**2, axis=-1) > max_margin**2
+                    distance_mask = np.sum((outer_points_flat[outer_indices] - inner_points_flat[inner_indices])**2,
+                                           axis=-1) > max_margin**2
 
                     # Only keep edges longer than max margin.
                     outer_indices = outer_indices[distance_mask]
@@ -690,7 +706,9 @@ class SLGBuilder(ABC):
                     # Get the column indices of the node indices.
                     inner_column_indices = inner_indices % inner_column_size
                     # Get first unique combination of comlumns.
-                    _, unique_column_indices = np.unique([outer_indices, inner_column_indices], return_index=True, axis=1)
+                    _, unique_column_indices = np.unique([outer_indices, inner_column_indices],
+                                                         return_index=True,
+                                                         axis=1)
 
                     # Filter indices to have only one from an outer node to each inner column.
                     outer_indices = outer_indices[unique_column_indices]
@@ -737,7 +755,9 @@ class SLGBuilder(ABC):
                         # Get the column indices of the node indices.
                         inner_column_indices = inner_indices % inner_column_size
                         # Get first unique combination of comlumns.
-                        _, unique_column_indices = np.unique([outer_indices, inner_column_indices], return_index=True, axis=1)
+                        _, unique_column_indices = np.unique([outer_indices, inner_column_indices],
+                                                             return_index=True,
+                                                             axis=1)
 
                         # Filter indices to have only one edge between each column.
                         outer_indices = outer_indices[unique_column_indices]
@@ -750,7 +770,9 @@ class SLGBuilder(ABC):
                         # Get the column indices of the node indices.
                         outer_column_indices = outer_indices % outer_columns_size
                         # Get first unique combination of comlumns.
-                        _, unique_column_indices = np.unique([outer_column_indices, inner_indices], return_index=True, axis=1)
+                        _, unique_column_indices = np.unique([outer_column_indices, inner_indices],
+                                                             return_index=True,
+                                                             axis=1)
 
                         # Filter indices to have only one edge between each column.
                         outer_indices = outer_indices[unique_column_indices]
@@ -825,7 +847,8 @@ class SLGBuilder(ABC):
             indices_2 = indices_2[unique_column_indices]
 
         # Add exclusion terms.
-        self.add_pairwise_terms(object_1_nodeids.flat[indices_1], object_2_nodeids.flat[indices_2], 0, 0, 0, self.inf_cap)
+        self.add_pairwise_terms(object_1_nodeids.flat[indices_1], object_2_nodeids.flat[indices_2], 0, 0, 0,
+                                self.inf_cap)
 
     def add_layered_exclusions(self, objects, margin=1, distance_metric='l1', reduce_redundancy=True, n_jobs=-1):
         """Add exclsion constraint edges forcing pairs of objects defined as a dictinary of lists.
@@ -845,7 +868,11 @@ class SLGBuilder(ABC):
             # Run in serial.
             for object_1 in objects:
                 for object_2 in objects[object_1]:
-                    self.add_layered_exclusion(object_1, object_2, margin=margin, distance_metric=distance_metric, reduce_redundancy=reduce_redundancy)
+                    self.add_layered_exclusion(object_1,
+                                               object_2,
+                                               margin=margin,
+                                               distance_metric=distance_metric,
+                                               reduce_redundancy=reduce_redundancy)
 
             # Return.
             return
@@ -911,4 +938,5 @@ class SLGBuilder(ABC):
                 indices_1, indices_2 = indices_list.pop(0)
 
                 if indices_1.size > 0:
-                    self.add_pairwise_terms(object_1_nodeids.flat[indices_1], object_2_nodeids.flat[indices_2], 0, 0, 0, self.inf_cap)
+                    self.add_pairwise_terms(object_1_nodeids.flat[indices_1], object_2_nodeids.flat[indices_2], 0, 0, 0,
+                                            self.inf_cap)

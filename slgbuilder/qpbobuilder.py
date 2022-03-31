@@ -41,7 +41,8 @@ class QPBOBuilder(SLGBuilder):
         elif self.capacity_type == np.float64:
             self.inf_cap = self.INF_CAP_FLOAT64
         else:
-            raise ValueError(f"Invalid capacity type '{self.capacity_type}'. Only 'int32', 'float32' and 'float64' allowed.")
+            raise ValueError(
+                f"Invalid capacity type '{self.capacity_type}'. Only 'int32', 'float32' and 'float64' allowed.")
 
     def create_graph_object(self):
         if self.capacity_type == np.int32:
@@ -51,7 +52,8 @@ class QPBOBuilder(SLGBuilder):
         elif self.capacity_type == np.float64:
             self.graph = thinqpbo.QPBODouble(self.estimated_nodes, self.estimated_edges)
         else:
-            raise ValueError(f"Invalid capacity type '{self.capacity_type}'. Only 'int32', 'float32' and 'float64' allowed.")
+            raise ValueError(
+                f"Invalid capacity type '{self.capacity_type}'. Only 'int32', 'float32' and 'float64' allowed.")
 
     def add_object(self, graph_object):
         if graph_object in self.objects:

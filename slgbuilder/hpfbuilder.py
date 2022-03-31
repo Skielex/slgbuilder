@@ -49,7 +49,8 @@ class HPFBuilder(SLGBuilder):
 
         # Check if a value was found.
         if self.inf_cap is None:
-            raise ValueError(f"Invalid capacity type '{self.capacity_type}'. Supported types are: {', '.join(self.INF_CAP_MAP)}")
+            raise ValueError(
+                f"Invalid capacity type '{self.capacity_type}'. Supported types are: {', '.join(self.INF_CAP_MAP)}")
 
     def create_graph_object(self):
         self.graph = thinhpf.hpf(
