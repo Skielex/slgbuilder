@@ -11,13 +11,13 @@ The package is primarily targeted multi-label/multi-object image segmentation pr
 - Object segmentation
 - Interacting multi-object segmentation
 
-### Teaser video
+### CVPR 2020 teaser video
 [![Teaser video](https://img.youtube.com/vi/CFUYuL1J85k/0.jpg)](https://www.youtube.com/watch?v=CFUYuL1J85k)
 
 ### Examples
 - [Example code and notebooks](https://github.com/Skielex/slgbuilder-examples)
 - [Experimental notebooks (advanced 2D and 3D segmentation) [CVPR2020]](https://doi.org/10.11583/DTU.12016941)
-- [Experimental notebooks (advanced 3D segmentation with parallel QPBO) [ICCV 2021]](https://openaccess.thecvf.com/content_CVPR_2020/supplemental/Jeppesen_Sparse_Layered_Graphs_CVPR_2020_supplemental.zip)
+- [Experimental notebooks (advanced 3D segmentation with parallel QPBO) [ICCV 2021]](https://doi.org/10.5281/zenodo.5201619)
 
 ## Grid-graph vs. ordered multi-column graph
 The package support both the common grid-graph structure, as used by [Delong and Boykov](https://doi.org/10.1109/ICCV.2009.5459263) and the ordered multi-column structure, popularized by [Li et al.](https://doi.org/10.1109/TPAMI.2006.19). Although representing image data in the grid structure may seem like the obvious choice, there are several advantages (e.g. smaller graph and "better" constraints) when using the ordered multi-column structure for segmentation if possible. However, doing so requires resample the data, which usually requires knowledge about the location of each object in the image.
@@ -38,16 +38,16 @@ The `HPFBuilder` is an alternative to the standard `MaxflowBuilder`. It relies o
 An alternative to the BK Maxflow solver is the [Google Maxflow](https://developers.google.com/optimization/flow/maxflow) implementation, which is a push-relabel algorithm. This can be done using the `ORBuilder` class. Apart from performance, the difference between the Google and BK Maxflow algorithms is that the Google implementation doesn't support floating type capacities. If `MaxflowBuilder` is slow when solving, try using the `ORBuilder` instead.
 
 ### MBK
-A slightly optimized modern reimplementation of the BK Maxflow algorithm is available using the `MBKBuilder`. Depends on the `shrdr` package. Using this builder should reduce memory usage and increase performance slightly compared to the `MaxflowBuilder`/`BKBuilder`.
+A slightly optimized modern reimplementation of the BK Maxflow algorithm is available using the `MBKBuilder`. Depends on the [`shrdr`](https://github.com/Skielex/shrdr) package. Using this builder should reduce memory usage and increase performance slightly compared to the `MaxflowBuilder`/`BKBuilder`.
 
 ### PBK
-A parallel version of the `MBK` implementation found in the `shrdr` package. Can significantly reduce solve for large problems on multicore systems. Jupyter notebooks with examples using the similar `PQPBOBuilder` can be found in the [supplementary material](https://openaccess.thecvf.com/content_CVPR_2020/supplemental/Jeppesen_Sparse_Layered_Graphs_CVPR_2020_supplemental.zip) of this [article](https://openaccess.thecvf.com/content_CVPR_2020/html/Jeppesen_Sparse_Layered_Graphs_for_Multi-Object_Segmentation_CVPR_2020_paper.html).
+A parallel version of the `MBK` implementation found in the [`shrdr`](https://github.com/Skielex/shrdr) package. Can significantly reduce solve for large problems on multicore systems. Jupyter notebooks with examples using the similar `PQPBOBuilder` can be found in the [supplementary material](https://doi.org/10.5281/zenodo.5201619) of this [article](https://openaccess.thecvf.com/content/ICCV2021/papers/Jeppesen_Faster_Multi-Object_Segmentation_Using_Parallel_Quadratic_Pseudo-Boolean_Optimization_ICCV_2021_paper.pdf).
 
 ### MQPBO
-A slightly optimized modern reimplementation of the QPBO algorithm is available using the `QPBOBuilder`. Depends on the `shrdr` package. Using this builder should reduce memory usage and increase performance slightly compared to the `QPBOBuilder`.
+A slightly optimized modern reimplementation of the QPBO algorithm is available using the `QPBOBuilder`. Depends on the [`shrdr`](https://github.com/Skielex/shrdr) package. Using this builder should reduce memory usage and increase performance slightly compared to the `QPBOBuilder`.
 
 ### PQPBO
-A parallel version of the `MQPBO` implementation found in the `shrdr` package. Can significantly reduce solve for large problems on multicore systems. Jupyter notebooks with examples of use can be found in the [supplementary material](https://openaccess.thecvf.com/content_CVPR_2020/supplemental/Jeppesen_Sparse_Layered_Graphs_CVPR_2020_supplemental.zip) of this [article](https://openaccess.thecvf.com/content/ICCV2021/supplemental/Jeppesen_Faster_Multi-Object_Segmentation_ICCV_2021_supplemental.zip).
+A parallel version of the `MQPBO` implementation found in the [`shrdr`](https://github.com/Skielex/shrdr) package. Can significantly reduce solve for large problems on multicore systems. Jupyter notebooks with examples of use can be found in the [supplementary material](https://doi.org/10.5281/zenodo.5201619) of this [article](https://openaccess.thecvf.com/content/ICCV2021/papers/Jeppesen_Faster_Multi-Object_Segmentation_Using_Parallel_Quadratic_Pseudo-Boolean_Optimization_ICCV_2021_paper.pdf).
 
 
 ## Dependencies
