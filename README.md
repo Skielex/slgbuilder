@@ -90,10 +90,18 @@ MIT License (see LICENSE file).
 
 ## Reference
 If you use this any of this for academic work, please consider citing our work:
-- [Sparse Layered Graphs for Multi-Object Segmentation](http://openaccess.thecvf.com/content_CVPR_2020/papers/Jeppesen_Sparse_Layered_Graphs_for_Multi-Object_Segmentation_CVPR_2020_paper.pdf) 
+> N. Jeppesen, A. N. Christensen, V. A. Dahl and A. B. Dahl, "Sparse Layered Graphs for Multi-Object Segmentation," 2020 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), 2020, pp. 12774-12782, doi: 10.1109/CVPR42600.2020.01279.<br>
+[ [paper](http://openaccess.thecvf.com/content_CVPR_2020/papers/Jeppesen_Sparse_Layered_Graphs_for_Multi-Object_Segmentation_CVPR_2020_paper.pdf) ]
+[ [supp](https://doi.org/10.11583/DTU.12016941) ]
+[ [CVF](https://openaccess.thecvf.com/content_CVPR_2020/html/Jeppesen_Sparse_Layered_Graphs_for_Multi-Object_Segmentation_CVPR_2020_paper.html) ]
+[ [IEEE](https://doi.org/10.1109/CVPR42600.2020.01279) ]
 
-- [Faster Multi-Object Segmentation using Parallel Quadratic Pseudo-Boolean Optimization](https://openaccess.thecvf.com/content/ICCV2021/papers/Jeppesen_Faster_Multi-Object_Segmentation_Using_Parallel_Quadratic_Pseudo-Boolean_Optimization_ICCV_2021_paper.pdf)
 
+> N. Jeppesen, P. M. Jensen, A. N. Christensen, A. B. Dahl and V. A. Dahl, "Faster Multi-Object Segmentation using Parallel Quadratic Pseudo-Boolean Optimization," 2021 IEEE/CVF International Conference on Computer Vision (ICCV), 2021, pp. 6240-6249, doi: 10.1109/ICCV48922.2021.00620.<br>
+[ [paper](https://openaccess.thecvf.com/content/ICCV2021/papers/Jeppesen_Faster_Multi-Object_Segmentation_Using_Parallel_Quadratic_Pseudo-Boolean_Optimization_ICCV_2021_paper.pdf) ]
+[ [supp](https://doi.org/10.5281/zenodo.5201619) ]
+[ [CVF](https://openaccess.thecvf.com/content/ICCV2021/html/Jeppesen_Faster_Multi-Object_Segmentation_Using_Parallel_Quadratic_Pseudo-Boolean_Optimization_ICCV_2021_paper.html) ]
+[ [IEEE](https://doi.org/10.1109/ICCV48922.2021.00620) ]
 
 
 ### BibTeX
