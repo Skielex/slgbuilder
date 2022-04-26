@@ -282,17 +282,7 @@ class SLGBuilder(ABC):
         if objects is None:
             objects = self.objects
 
-        def add_region_edges(g, b, nodeids):
-
-            b_mask = b > 0
-            not_b_mask = ~b_mask
-            np.abs(b, out=b)
-
-            # Add unary terms (terminal edges).
-            self.add_unary_terms(nodeids[b_mask], 0, b[b_mask])
-            self.add_unary_terms(nodeids[not_b_mask], b[not_b_mask], 0)
-
-        for obj in self.objects:
+        for obj in objects:
             # Get nodes for object in this graph.
             nodeids = self.get_nodeids(obj)
 
@@ -305,7 +295,13 @@ class SLGBuilder(ABC):
                 b = b.astype(obj.data.dtype)
 
             # Add region edges.
-            add_region_edges(self.graph, b, nodeids)
+            b_mask = b > 0
+            not_b_mask = ~b_mask
+            np.abs(b, out=b)
+
+            # Add unary terms (terminal edges).
+            self.add_unary_terms(nodeids[b_mask], 0, b[b_mask])
+            self.add_unary_terms(nodeids[not_b_mask], b[not_b_mask], 0)
 
     def add_containment(self, outer_object, inner_object, margin=1, distance_metric='l1'):
         """Add containment constraint edges forcing inner_object to be within outer_object."""
