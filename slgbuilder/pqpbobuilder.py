@@ -74,7 +74,7 @@ class PQPBOBuilder(SLGBuilder):
     def create_graph_object(self):
         if self.expected_blocks == 0:
             object_max_block_ids = [np.max(go.block_ids) for go in self.objects if go.block_ids is not None]
-            if len(object_max_block_ids) != len(self.objects):
+            if object_max_block_ids and len(object_max_block_ids) != len(self.objects):
                 raise ValueError(
                     "Some objects are missing block_ids. Either all graph objects should have block_ids set or none of them should."
                 )
