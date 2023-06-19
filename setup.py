@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="slgbuilder",
-    version="0.2.0",
+    version="0.2.1",
     author="Niels Jeppesen",
     author_email="niejep@dtu.dk",
     description="A Python package for building and cutting sparse layered s-t graphs.",
