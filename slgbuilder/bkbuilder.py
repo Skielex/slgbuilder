@@ -6,7 +6,6 @@ from .slgbuilder import SLGBuilder
 
 
 class BKBuilder(SLGBuilder):
-
     def __init__(self, estimated_nodes=0, estimated_edges=0, capacity_type=np.int32, jit_build=True):
         """Creates a helper for creating and solves a maxflow graph using the Boykov-Kolmogorov (BK) maxflow implementation. 
         int (int32), short (int16), float (float32) or double (float64) edge capacities/energies are supported.
@@ -91,7 +90,7 @@ class BKBuilder(SLGBuilder):
             self.pairwise_e10.append(e10.ravel().astype(self.capacity_type))
             self.pairwise_e11.append(e11.ravel().astype(self.capacity_type))
         else:
-            np.vectorize(self.graph.add_edge, otypes=[np.bool])(i, j, cap, rcap)
+            np.vectorize(self.graph.add_edge, otypes=[bool])(i, j, cap, rcap)
 
     def add_unary_terms(self, i, e0, e1):
         self.add_terminal_edges(i, e1, e0)
@@ -104,7 +103,7 @@ class BKBuilder(SLGBuilder):
             self.unary_e0.append(e0.ravel().astype(self.capacity_type))
             self.unary_e1.append(e1.ravel().astype(self.capacity_type))
         else:
-            np.vectorize(self.graph.add_tweights, otypes=[np.bool])(i, source_cap, sink_cap)
+            np.vectorize(self.graph.add_tweights, otypes=[bool])(i, source_cap, sink_cap)
 
     def get_labels(self, i):
         return self.what_segments(i)
@@ -112,10 +111,10 @@ class BKBuilder(SLGBuilder):
     def what_segments(self, i):
         if isinstance(i, GraphObject):
             return self.what_segments(self.get_nodeids(i))
-        return np.vectorize(self.graph.what_segment, otypes=[np.bool])(i)
+        return np.vectorize(self.graph.what_segment, otypes=[bool])(i)
 
     def mark_nodes(self, i):
-        np.vectorize(self.graph.mark_node, otypes=[np.bool])(i)
+        np.vectorize(self.graph.mark_node, otypes=[bool])(i)
 
     def solve(self):
         self.build_graph()

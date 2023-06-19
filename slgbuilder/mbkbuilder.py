@@ -71,7 +71,8 @@ class MBKBuilder(SLGBuilder):
             first_id = self.graph.add_node(graph_object.data.size)
 
         self.objects.append(graph_object)
-        self.nodes.append(first_id)
+        self.object_ids[graph_object] = object_id
+        self.nodes[graph_object] = first_id
 
         return object_id
 
@@ -124,7 +125,7 @@ class MBKBuilder(SLGBuilder):
         return np.vectorize(self.graph.what_segment, otypes=[np.int8])(i)
 
     def mark_nodes(self, i):
-        np.vectorize(self.graph.mark_node, otypes=[np.bool])(i)
+        np.vectorize(self.graph.mark_node, otypes=[bool])(i)
 
     def solve(self, reuse_trees=True):
         self.build_graph()

@@ -105,7 +105,8 @@ class PBKBuilder(SLGBuilder):
             first_id = self._add_nodes(graph_object)
 
         self.objects.append(graph_object)
-        self.nodes.append(first_id)
+        self.object_ids[graph_object] = object_id
+        self.nodes[graph_object] = first_id
 
         return object_id
 
