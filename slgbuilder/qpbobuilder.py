@@ -6,6 +6,7 @@ from .slgbuilder import SLGBuilder
 
 
 class QPBOBuilder(SLGBuilder):
+
     def __init__(
         self,
         estimated_nodes=0,
@@ -41,7 +42,8 @@ class QPBOBuilder(SLGBuilder):
         elif self.capacity_type == np.float64:
             self.inf_cap = self.INF_CAP_FLOAT64
         else:
-            raise ValueError(f"Invalid capacity type '{self.capacity_type}'. Only 'int32', 'float32' and 'float64' allowed.")
+            raise ValueError(
+                f"Invalid capacity type '{self.capacity_type}'. Only 'int32', 'float32' and 'float64' allowed.")
 
     def create_graph_object(self):
         if self.capacity_type == np.int32:
@@ -51,7 +53,8 @@ class QPBOBuilder(SLGBuilder):
         elif self.capacity_type == np.float64:
             self.graph = thinqpbo.QPBODouble(self.estimated_nodes, self.estimated_edges)
         else:
-            raise ValueError(f"Invalid capacity type '{self.capacity_type}'. Only 'int32', 'float32' and 'float64' allowed.")
+            raise ValueError(
+                f"Invalid capacity type '{self.capacity_type}'. Only 'int32', 'float32' and 'float64' allowed.")
 
     def add_object(self, graph_object):
         if graph_object in self.object_ids:
@@ -61,7 +64,7 @@ class QPBOBuilder(SLGBuilder):
         # Add object to graph.
         object_id = len(self.objects)
 
-        if self.jit_build:
+        if self.graph is None:
             first_id = (np.min(self.nodes[self.objects[-1]]) + self.objects[-1].data.size) if self.objects else 0
         else:
             first_id = self._add_nodes(graph_object)

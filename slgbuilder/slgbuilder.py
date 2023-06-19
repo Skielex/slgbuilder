@@ -6,7 +6,6 @@ import numpy as np
 from scipy import sparse
 from sklearn.neighbors import NearestNeighbors
 
-from .graphobject import GraphObject
 from .radius_neighbor_worker import init_radius_neighbor_worker, radius_neighbor_worker
 
 
@@ -43,6 +42,17 @@ class SLGBuilder(ABC):
         self.jit_build = jit_build
 
         self.graph = None
+        self.solve_count = 0
+        self.mark_changed_nodes = True
+
+        # Caching node ids list by default is probably a good idea.
+        # 1. Creating a new list takes some time and may be very expensive in
+        # cases where get_nodeids is called many time, such as when using
+        # `where` parameter.
+        # 2. Not caching could reduce memory use in some cases, however,
+        # it could also increase memory usage as new arrays are created
+        # and sliced instead of slicing the same array each time.
+        self.cache_nodeids = True
 
         self.inf_cap = None
         self.flow_type = np.dtype(flow_type)
@@ -50,9 +60,6 @@ class SLGBuilder(ABC):
         self.arc_index_type = np.dtype(arc_index_type)
         self.node_index_type = np.dtype(node_index_type)
         self._test_types_and_set_inf_cap()
-
-        if not jit_build:
-            self.create_graph_object()
 
         self.objects = []
         self.object_ids = {}
@@ -68,6 +75,9 @@ class SLGBuilder(ABC):
         self.pairwise_e01 = []
         self.pairwise_e10 = []
         self.pairwise_e11 = []
+
+        if not jit_build:
+            self.create_graph_object()
 
     @abstractmethod
     def _add_nodes(self, object):
@@ -91,7 +101,10 @@ class SLGBuilder(ABC):
     def get_nodeids(self, graph_object):
         nodeids = self.nodes[graph_object]
         if np.isscalar(nodeids):
-            return np.arange(nodeids, nodeids + graph_object.data.size).reshape(graph_object.data.shape)
+            nodeids = np.arange(nodeids, nodeids + graph_object.data.size).reshape(graph_object.data.shape)
+            if self.cache_nodeids:
+                self.nodes[graph_object] = nodeids
+            return nodeids
         else:
             # It is an array.
             return nodeids
@@ -112,24 +125,11 @@ class SLGBuilder(ABC):
     def solve(self):
         pass
 
-    def broadcast_unary_terms(self, i, e0, e1):
-        i = np.asarray(i, dtype=self.node_index_type)
-        e0 = np.asarray(e0, dtype=self.capacity_type)
-        e1 = np.asarray(e1, dtype=self.capacity_type)
-        i, e0, e1 = np.broadcast_arrays(i, e0, e1)
-        i, e0, e1 = i.ravel(), e0.ravel(), e1.ravel()
-        return i, e0, e1
-
-    def broadcast_pairwise_terms(self, i, j, e00, e01, e10, e11):
-        i = np.asarray(i, dtype=self.node_index_type)
-        j = np.asarray(j, dtype=self.node_index_type)
-        e00 = np.asarray(e00, dtype=self.capacity_type)
-        e01 = np.asarray(e01, dtype=self.capacity_type)
-        e10 = np.asarray(e10, dtype=self.capacity_type)
-        e11 = np.asarray(e11, dtype=self.capacity_type)
-        i, j, e00, e01, e10, e11 = np.broadcast_arrays(i, j, e00, e01, e10, e11)
-        i, j, e00, e01, e10, e11 = i.ravel(), j.ravel(), e00.ravel(), e01.ravel(), e10.ravel(), e11.ravel()
-        return i, j, e00, e01, e10, e11
+    def broadcast_terms(self, indices, energies):
+        arrays = [np.asarray(a, dtype=self.node_index_type) for a in indices]
+        arrays += [np.asarray(a, dtype=self.capacity_type) for a in energies]
+        arrays = np.broadcast_arrays(*arrays)
+        return [a.ravel() for a in arrays]
 
     def build_graph(self, sort_pairwise_terms=False):
 
@@ -182,10 +182,10 @@ class SLGBuilder(ABC):
             i = np.concatenate(self.pairwise_from)
             j = np.concatenate(self.pairwise_to)
 
-            e00 = np.concatenate(self.pairwise_e00)
+            e00 = np.concatenate(self.pairwise_e00) if self.pairwise_e00 else None
             e01 = np.concatenate(self.pairwise_e01)
             e10 = np.concatenate(self.pairwise_e10)
-            e11 = np.concatenate(self.pairwise_e11)
+            e11 = np.concatenate(self.pairwise_e11) if self.pairwise_e11 else None
 
             # No longer needed.
             self.pairwise_from.clear()
@@ -197,15 +197,18 @@ class SLGBuilder(ABC):
 
             if sort_pairwise_terms:
                 # Sort.
-                sort_indices = np.lexsort((-i, -j))
+                # The reverse sort appears to perform best for BK Maxflow.
+                sort_indices = np.lexsort((i, j))[::-1]
 
                 # Sorted edges.
                 i = i[sort_indices]
                 j = j[sort_indices]
-                e00 = e00[sort_indices]
+                if e00 is not None:
+                    e00 = e00[sort_indices]
                 e01 = e01[sort_indices]
                 e10 = e10[sort_indices]
-                e11 = e11[sort_indices]
+                if e11 is not None:
+                    e11 = e11[sort_indices]
 
             # GC before adding edges.
             gc.collect()
@@ -213,8 +216,14 @@ class SLGBuilder(ABC):
             # Add edges to graph.
             step = 100000
             for r in range(0, i.size, step):
-                self.add_pairwise_terms(i[r:r + step], j[r:r + step], e00[r:r + step], e01[r:r + step], e10[r:r + step],
-                                        e11[r:r + step])
+                self.add_pairwise_terms(
+                    i[r:r + step],
+                    j[r:r + step],
+                    e00[r:r + step] if e00 is not None else e00,
+                    e01[r:r + step],
+                    e10[r:r + step],
+                    e11[r:r + step] if e11 is not None else e11,
+                )
 
     def add_boundary_cost(self, objects=None, beta=1, symmetric=True):
         """Add boundary cost by adding edges between non-terminal nodes based on object data."""
@@ -273,17 +282,7 @@ class SLGBuilder(ABC):
         if objects is None:
             objects = self.objects
 
-        def add_region_edges(g, b, nodeids):
-
-            b_mask = b > 0
-            not_b_mask = ~b_mask
-            np.abs(b, out=b)
-
-            # Add unary terms (terminal edges).
-            self.add_unary_terms(nodeids[b_mask], 0, b[b_mask])
-            self.add_unary_terms(nodeids[not_b_mask], b[not_b_mask], 0)
-
-        for obj in self.objects:
+        for obj in objects:
             # Get nodes for object in this graph.
             nodeids = self.get_nodeids(obj)
 
@@ -296,7 +295,13 @@ class SLGBuilder(ABC):
                 b = b.astype(obj.data.dtype)
 
             # Add region edges.
-            add_region_edges(self.graph, b, nodeids)
+            b_mask = b > 0
+            not_b_mask = ~b_mask
+            np.abs(b, out=b)
+
+            # Add unary terms (terminal edges).
+            self.add_unary_terms(nodeids[b_mask], 0, b[b_mask])
+            self.add_unary_terms(nodeids[not_b_mask], b[not_b_mask], 0)
 
     def add_containment(self, outer_object, inner_object, margin=1, distance_metric='l1'):
         """Add containment constraint edges forcing inner_object to be within outer_object."""
@@ -410,7 +415,7 @@ class SLGBuilder(ABC):
                 # Add pairwise terms (edges) between neighbors.
                 self.add_pairwise_terms(ids[:-1], ids[1:], 0, beta, beta, 0)
 
-    def add_layered_boundary_cost(self, objects=None):
+    def add_layered_boundary_cost(self, objects=None, axis=0):
         """Add layered boundary cost. This function assumes an N-D regular grid."""
 
         if objects is None:
@@ -422,9 +427,12 @@ class SLGBuilder(ABC):
 
             # Calculate weights (Eq1).
             # Prevent empty solution (sec 4.1).
-            w = np.zeros(obj.data.shape, dtype=self.capacity_type)
+            w = np.moveaxis(np.zeros(obj.data.shape, dtype=self.capacity_type), axis, 0)
             w[0] = -self.inf_cap
-            w[1:] = np.diff(obj.data, axis=0)
+            w[1:] = np.diff(np.moveaxis(obj.data, axis, 0), axis=0)
+
+            # Move primary axis first.
+            nodeids = np.moveaxis(nodeids, axis, 0)
 
             # Add intracolumn edges (Eq2).
             self.add_pairwise_terms(nodeids[:-1], nodeids[1:], 0, self.inf_cap, 0, 0)
@@ -440,14 +448,14 @@ class SLGBuilder(ABC):
             # Add unary terms (terminal edges).
             self.add_unary_terms(nodeids, e0, e1)
 
-    def add_layered_region_cost(self, graph_object, outer_region_cost, inner_region_cost):
+    def add_layered_region_cost(self, graph_object, outer_region_cost, inner_region_cost, axis=0):
         """Add layered region cost. This function assumes an N-D regular grid."""
 
         # Get nodes for object in this graph.
-        nodeids = self.get_nodeids(graph_object)
+        nodeids = np.moveaxis(self.get_nodeids(graph_object), axis, 0)
 
         # Calculate weights.
-        w = inner_region_cost - outer_region_cost
+        w = np.moveaxis(inner_region_cost - outer_region_cost, axis, 0)
         # Prevent empty solution.
         w[0] = -self.inf_cap
 
@@ -462,15 +470,14 @@ class SLGBuilder(ABC):
         # Add terminal edges.
         self.add_unary_terms(nodeids, e0, e1)
 
-    def add_layered_smoothness(self, objects=None, delta=1, wrap=True):
+    def add_layered_smoothness(self, objects=None, delta=1, wrap=True, axis=0, where=None):
         """Add hard smoothness constraint to layered object. This function assumes an N-D regular grid."""
-
         if objects is None:
             objects = self.objects
 
         # Create delta per object if not supplied.
         if np.isscalar(delta):
-            delta = (delta * np.ones(len(objects))).astype(np.int)
+            delta = np.full(len(objects), delta)
 
         # Create wrap per object if not supplied.
         if np.isscalar(wrap):
@@ -480,6 +487,13 @@ class SLGBuilder(ABC):
 
             # Get nodes for object in this graph.
             nodeids = self.get_nodeids(obj)
+
+            # Move primary axis first.
+            nodeids = np.moveaxis(nodeids, axis, 0)
+
+            if where is not None:
+                # If the where argument is set, select nodes accordingly.
+                nodeids = nodeids[:, where]
 
             if nodeids.shape[0] <= 1:
                 # If the first axis is 0 or 1, skip object.
@@ -524,7 +538,8 @@ class SLGBuilder(ABC):
                         self.add_pairwise_terms(ids[:, -1], ids[:, 0], 0, self.inf_cap, 0, 0)
                         self.add_pairwise_terms(ids[:, 0], ids[:, -1], 0, self.inf_cap, 0, 0)
 
-                else:
+                elif dx == int(dx):
+                    dx = int(dx)
                     # Add intercolumn edges (Eq3).
                     # Add pairwise terms.
                     self.add_pairwise_terms(ids[:-dx, :-1], ids[dx:, 1:], 0, self.inf_cap, 0, 0)
@@ -535,13 +550,36 @@ class SLGBuilder(ABC):
                         self.add_pairwise_terms(ids[:-dx, -1], ids[dx:, 0], 0, self.inf_cap, 0, 0)
                         self.add_pairwise_terms(ids[:-dx, 0], ids[dx:, -1], 0, self.inf_cap, 0, 0)
 
+                elif dx > 0 and dx < 1:
+                    # If smoothness is less than one, we interpret it as a factor, i.e.,
+                    # 1/2 = distance of two on the other axis.
+                    dy = int(round(1 / dx))
+
+                    # Add intercolumn edges (Eq3).
+                    # Add pairwise terms.
+                    if object_wrap[dim - 1]:
+                        # If we're wrapping, use roll to offset nodes.
+                        for y in range(1, dy + 1):
+                            self.add_pairwise_terms(ids[:-1], np.roll(ids[1:], y, axis=1), 0, self.inf_cap, 0, 0)
+                            self.add_pairwise_terms(ids[:-1], np.roll(ids[1:], -y, axis=1), 0, self.inf_cap, 0, 0)
+                    else:
+                        # If we're not wrapping, slice to offset.
+                        for y in range(1, dy + 1):
+                            self.add_pairwise_terms(ids[:-1, :-y], ids[1:, y:], 0, self.inf_cap, 0, 0)
+                            self.add_pairwise_terms(ids[:-1, y:], ids[1:, :-y], 0, self.inf_cap, 0, 0)
+
+                else:
+                    raise ValueError(f"Invalid delta value '{dx}'.")
+
     def add_layered_containment(self,
                                 outer_object,
                                 inner_object,
                                 min_margin=0,
                                 max_margin=None,
                                 distance_metric='l2',
-                                reduce_redundancy=True):
+                                reduce_redundancy=True,
+                                axis=0,
+                                where=None):
         """Add layered containment."""
 
         if outer_object == inner_object:
@@ -554,6 +592,19 @@ class SLGBuilder(ABC):
         # Get points.
         outer_points = outer_object.sample_points
         inner_points = inner_object.sample_points
+
+        # Move axes.
+        outer_nodeids = np.moveaxis(outer_nodeids, axis, 0)
+        inner_nodeids = np.moveaxis(inner_nodeids, axis, 0)
+        outer_points = np.moveaxis(outer_points, axis if axis >= 0 else axis - 1, 0)
+        inner_points = np.moveaxis(inner_points, axis if axis >= 0 else axis - 1, 0)
+
+        if where is not None:
+            # If the where argument is set, select points and nodes accordingly.
+            outer_nodeids = outer_nodeids[:, where]
+            inner_nodeids = inner_nodeids[:, where]
+            outer_points = outer_points[:, where]
+            inner_points = inner_points[:, where]
 
         if outer_points.ndim != inner_points.ndim or outer_points.shape[-1] != inner_points.shape[-1]:
             raise ValueError(
@@ -581,6 +632,10 @@ class SLGBuilder(ABC):
                     self.add_pairwise_terms(outer_nodeids[min_margin:], inner_nodeids[:-min_margin], 0, self.inf_cap, 0,
                                             0)
                     self.add_pairwise_terms(outer_nodeids[:min_margin], inner_nodeids[0], 0, self.inf_cap, 0, 0)
+                    # Force inner object away from the outer when the outer is near the data boundary.
+                    # Without this minimum distance is not properly enforced for a solution
+                    # where the the cut is found for inner_nodeids[-min_margin:].
+                    self.add_unary_terms(inner_nodeids[-min_margin], 0, self.inf_cap)
 
         # Else we need to find nodes to connect.
         else:
@@ -725,7 +780,7 @@ class SLGBuilder(ABC):
                     # Add containment edges.
                     self.add_pairwise_terms(outer_ids, inner_ids, 0, self.inf_cap, 0, 0)
 
-    def add_layered_exclusion(self, object_1, object_2, margin=1, distance_metric='l1', reduce_redundancy=True):
+    def add_layered_exclusion(self, object_1, object_2, margin=1, distance_metric='l1', reduce_redundancy=True, axis=0):
         """Add exclsion constraint edges forcing object_1 and object_2 not to overlap.
         This function assumes a layered boundary cost has been applied to the objects.
         """
@@ -740,6 +795,12 @@ class SLGBuilder(ABC):
         # Get points.
         object_1_points = object_1.sample_points
         object_2_points = object_2.sample_points
+
+        # Move axes.
+        object_1_nodeids = np.moveaxis(object_1_nodeids, axis, 0)
+        object_2_nodeids = np.moveaxis(object_2_nodeids, axis, 0)
+        object_1_points = np.moveaxis(object_1_points, axis if axis >= 0 else axis - 1, 0)
+        object_2_points = np.moveaxis(object_2_points, axis if axis >= 0 else axis - 1, 0)
 
         # Create nearest neighbors tree.
         neigh = NearestNeighbors(radius=margin, metric=distance_metric)

@@ -1,30 +1,34 @@
 import numpy as np
-import shrdr
+import thinhpf
 
 from .graphobject import GraphObject
 from .slgbuilder import SLGBuilder
 
 
-class MQPBOBuilder(SLGBuilder):
+class HPFBuilder(SLGBuilder):
+
+    SOURCE_NODE_ID = 0
+    SINK_NODE_ID = 1
 
     def __init__(
         self,
         estimated_nodes=0,
         estimated_edges=0,
         capacity_type=np.int32,
-        arc_index_type=np.int32,
-        node_index_type=np.int32,
+        label_order='hf',
+        root_order='lifo',
         jit_build=True,
     ):
         """TODO"""
-        flow_type = np.int64 if np.issubdtype(capacity_type, np.integer) else np.float64
+        self.label_order = label_order
+        self.root_order = root_order
         super().__init__(
             estimated_nodes=estimated_nodes,
             estimated_edges=estimated_edges,
-            flow_type=flow_type,
+            flow_type=capacity_type,
             capacity_type=capacity_type,
-            arc_index_type=arc_index_type,
-            node_index_type=node_index_type,
+            arc_index_type=np.uint32,
+            node_index_type=np.uint32,
             jit_build=jit_build,
         )
 
@@ -34,10 +38,10 @@ class MQPBOBuilder(SLGBuilder):
     def _test_types_and_set_inf_cap(self):
 
         # Test if flow type is valid.
-        shrdr.qpbo(
+        thinhpf.hpf(
             capacity_type=self.capacity_type,
-            arc_index_type=self.arc_index_type,
-            node_index_type=self.node_index_type,
+            label_order=self.label_order,
+            root_order=self.root_order,
         )
 
         # Set infinite capacity value.
@@ -49,33 +53,36 @@ class MQPBOBuilder(SLGBuilder):
                 f"Invalid capacity type '{self.capacity_type}'. Supported types are: {', '.join(self.INF_CAP_MAP)}")
 
     def create_graph_object(self):
-        self.graph = shrdr.qpbo(
+        self.graph = thinhpf.hpf(
             self.estimated_nodes,
             self.estimated_edges,
-            expect_nonsubmodular=True,
             capacity_type=self.capacity_type,
-            arc_index_type=self.arc_index_type,
-            node_index_type=self.node_index_type,
         )
+        self.graph.set_source(self.SOURCE_NODE_ID)
+        self.graph.set_sink(self.SINK_NODE_ID)
+        # Add source and sink nodes.
+        self.graph.add_node(2)
 
     def add_object(self, graph_object):
-        if graph_object in self.object_ids:
+        if graph_object in self.objects:
             # If object is already added, return its id.
-            return self.object_ids[graph_object]
+            return self.objects.index(graph_object)
 
         # Add object to graph.
         object_id = len(self.objects)
 
         if self.graph is None:
-            first_id = (np.min(self.nodes[self.objects[-1]]) + self.objects[-1].data.size) if self.objects else 0
+            first_id = (np.min(self.nodes[-1]) + self.objects[-1].data.size) if self.objects else 2  # Start at two.
         else:
-            first_id = self._add_nodes(graph_object)
+            first_id = self.graph.add_node(graph_object.data.size) - graph_object.data.size
 
         self.objects.append(graph_object)
-        self.object_ids[graph_object] = object_id
-        self.nodes[graph_object] = first_id
+        self.nodes.append(first_id)
 
         return object_id
+
+    def add_terminal_edges(self, i, source_cap, sink_cap):
+        self.add_unary_terms(i, sink_cap, source_cap)
 
     def add_unary_terms(self, i, e0, e1):
         i, e0, e1 = self.broadcast_terms([i], [e0, e1])
@@ -86,43 +93,48 @@ class MQPBOBuilder(SLGBuilder):
             self.unary_e1.append(e1)
         else:
             i = np.ascontiguousarray(i)
-            e0 = np.ascontiguousarray(e0)
-            e1 = np.ascontiguousarray(e1)
-            if self.solve_count > 0:
-                self.graph.mark_nodes(i)
-            self.graph.add_unary_terms(i, e0, e1)
+            if np.any(e1):
+                e1 = np.ascontiguousarray(e1)
+                self.graph.add_edges(np.full_like(i, self.SOURCE_NODE_ID), i, e1)
+            if np.any(e0):
+                e0 = np.ascontiguousarray(e0)
+                self.graph.add_edges(i, np.full_like(i, self.SINK_NODE_ID), e0)
+
+    def add_edges(self, i, j, cap, rcap):
+        self.add_pairwise_terms(i, j, 0, cap, rcap, 0)
 
     def add_pairwise_terms(self, i, j, e00, e01, e10, e11):
-        i, j, e00, e01, e10, e11 = self.broadcast_terms([i, j], [e00, e01, e10, e11])
+        # TODO: Warn that e00 and e11 are ignores.
+        i, j, e01, e10 = self.broadcast_terms([i, j], [e01, e10])
 
         if self.graph is None:
             self.pairwise_from.append(i)
             self.pairwise_to.append(j)
-            self.pairwise_e00.append(e00)
             self.pairwise_e01.append(e01)
             self.pairwise_e10.append(e10)
-            self.pairwise_e11.append(e11)
         else:
             i = np.ascontiguousarray(i)
             j = np.ascontiguousarray(j)
-            e00 = np.ascontiguousarray(e00)
-            e01 = np.ascontiguousarray(e01)
-            e10 = np.ascontiguousarray(e10)
-            e11 = np.ascontiguousarray(e11)
-            if self.solve_count > 0:
-                self.graph.mark_nodes(i)
-                self.graph.mark_nodes(j)
-            self.graph.add_pairwise_terms(i, j, e00, e01, e10, e11)
+            if np.any(e01):
+                e01 = np.ascontiguousarray(e01)
+                self.graph.add_edges(i, j, e01)
+            if np.any(e10):
+                e10 = np.ascontiguousarray(e10)
+                self.graph.add_edges(j, i, e10)
 
     def get_labels(self, i):
         if isinstance(i, GraphObject):
             return self.get_labels(self.get_nodeids(i))
-        return np.vectorize(self.graph.get_label, otypes=[np.int8])(i)
+        return np.vectorize(self.graph.what_label, otypes=[np.uint32])(i)
 
-    def solve(self, compute_weak_persistencies=True, reuse_trees=True):
+    def mark_nodes(self, i):
+        np.vectorize(self.graph.mark_node, otypes=[np.bool])(i)
+
+    def solve(self):
+        if self.solve_count > 0:
+            raise Exception("solve may only be called once.")
         self.build_graph()
-        flow = self.graph.solve(reuse_trees and self.solve_count > 0)
-        if compute_weak_persistencies:
-            self.graph.compute_weak_persistencies()
+        self.graph.mincut()
+        flow = self.graph.compute_maxflow()
         self.solve_count += 1
         return flow

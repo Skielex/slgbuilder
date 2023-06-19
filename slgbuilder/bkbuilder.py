@@ -6,6 +6,7 @@ from .slgbuilder import SLGBuilder
 
 
 class BKBuilder(SLGBuilder):
+
     def __init__(self, estimated_nodes=0, estimated_edges=0, capacity_type=np.int32, jit_build=True):
         """Creates a helper for creating and solves a maxflow graph using the Boykov-Kolmogorov (BK) maxflow implementation. 
         int (int32), short (int16), float (float32) or double (float64) edge capacities/energies are supported.
@@ -74,15 +75,6 @@ class BKBuilder(SLGBuilder):
         self.nodes[graph_object] = first_id
 
         return object_id
-
-    def get_nodeids(self, graph_object):
-        nodeids = self.nodes[graph_object]
-
-        if np.isscalar(nodeids):
-            return np.arange(nodeids, nodeids + graph_object.data.size).reshape(graph_object.data.shape)
-        else:
-            # It is an array.
-            return nodeids
 
     def add_pairwise_terms(self, i, j, e00, e01, e10, e11):
         # TODO: Warn that e00 and e11 are ignores.
