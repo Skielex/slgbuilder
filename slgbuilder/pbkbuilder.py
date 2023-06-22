@@ -98,6 +98,7 @@ class PBKBuilder(SLGBuilder):
 
         # Add object to graph.
         object_id = len(self.objects)
+        self.object_ids[graph_object] = object_id
 
         if self.graph is None:
             first_id = (np.min(self.nodes[-1]) + self.objects[-1].data.size) if self.objects else 0
@@ -105,7 +106,6 @@ class PBKBuilder(SLGBuilder):
             first_id = self._add_nodes(graph_object)
 
         self.objects.append(graph_object)
-        self.object_ids[graph_object] = object_id
         self.nodes[graph_object] = first_id
 
         return object_id

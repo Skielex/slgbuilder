@@ -6,7 +6,6 @@ from .slgbuilder import SLGBuilder
 
 
 class MQPBOBuilder(SLGBuilder):
-
     def __init__(
         self,
         estimated_nodes=0,
@@ -65,6 +64,7 @@ class MQPBOBuilder(SLGBuilder):
 
         # Add object to graph.
         object_id = len(self.objects)
+        self.object_ids[graph_object] = object_id
 
         if self.graph is None:
             first_id = (np.min(self.nodes[self.objects[-1]]) + self.objects[-1].data.size) if self.objects else 0
@@ -72,7 +72,6 @@ class MQPBOBuilder(SLGBuilder):
             first_id = self._add_nodes(graph_object)
 
         self.objects.append(graph_object)
-        self.object_ids[graph_object] = object_id
         self.nodes[graph_object] = first_id
 
         return object_id

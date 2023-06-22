@@ -55,11 +55,11 @@ class ORBuilder(SLGBuilder):
 
         # Add object to graph.
         object_id = len(self.objects)
+        self.object_ids[graph_object] = object_id
 
         first_id = (np.min(self.nodes[self.objects[-1]]) + self.objects[-1].data.size) if self.objects else 2
 
         self.objects.append(graph_object)
-        self.object_ids[graph_object] = object_id
         self.nodes[graph_object] = first_id
 
         return object_id
