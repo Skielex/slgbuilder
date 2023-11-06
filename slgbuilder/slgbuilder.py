@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from multiprocessing import Pool, RawArray, cpu_count
 
 import numpy as np
+import numpy.typing as npt
 from scipy import sparse
 from sklearn.neighbors import NearestNeighbors
 
@@ -27,13 +28,13 @@ class SLGBuilder(ABC):
 
     def __init__(
         self,
-        estimated_nodes=0,
-        estimated_edges=0,
-        flow_type=np.int64,
-        capacity_type=np.int32,
-        arc_index_type=np.uint32,
-        node_index_type=np.uint32,
-        jit_build=True,
+        estimated_nodes: int = 0,
+        estimated_edges: int = 0,
+        flow_type: npt.DTypeLike = np.int64,
+        capacity_type: npt.DTypeLike = np.int32,
+        arc_index_type: npt.DTypeLike = np.uint32,
+        node_index_type: npt.DTypeLike = np.uint32,
+        jit_build: bool = True,
     ):
         """Creates a ```SLGBuilder``` object used by subclasses to create graphs."""
 
@@ -62,7 +63,8 @@ class SLGBuilder(ABC):
         self._test_types_and_set_inf_cap()
 
         self.objects = []
-        self.nodes = []
+        self.object_ids = {}
+        self.nodes = {}
 
         # Create lists for terms.
         self.unary_nodes = []
@@ -98,12 +100,11 @@ class SLGBuilder(ABC):
         return [self.add_object(o) for o in graph_objects]
 
     def get_nodeids(self, graph_object):
-        object_index = self.objects.index(graph_object)
-        nodeids = self.nodes[object_index]
+        nodeids = self.nodes[graph_object]
         if np.isscalar(nodeids):
             nodeids = np.arange(nodeids, nodeids + graph_object.data.size).reshape(graph_object.data.shape)
             if self.cache_nodeids:
-                self.nodes[object_index] = nodeids
+                self.nodes[graph_object] = nodeids
             return nodeids
         else:
             # It is an array.
@@ -287,11 +288,11 @@ class SLGBuilder(ABC):
             nodeids = self.get_nodeids(obj)
 
             # Get region cost.
-            b = obj.data.astype(np.float)
+            b = obj.data.astype(float)
             b -= np.min(b)
             b -= np.max(b) / 2
             b *= 2 * alpha
-            if obj.data.dtype != np.float:
+            if obj.data.dtype != float:
                 b = b.astype(obj.data.dtype)
 
             # Add region edges.
@@ -421,6 +422,12 @@ class SLGBuilder(ABC):
         if objects is None:
             objects = self.objects
 
+        if not objects:
+            return
+
+        if self.inf_cap is None:
+            raise ValueError('inf_cap is not set.')
+
         for obj in objects:
             # Get nodes for object in this graph.
             nodeids = self.get_nodeids(obj)
@@ -450,6 +457,9 @@ class SLGBuilder(ABC):
 
     def add_layered_region_cost(self, graph_object, outer_region_cost, inner_region_cost, axis=0):
         """Add layered region cost. This function assumes an N-D regular grid."""
+
+        if self.inf_cap is None:
+            raise ValueError('inf_cap is not set.')
 
         # Get nodes for object in this graph.
         nodeids = np.moveaxis(self.get_nodeids(graph_object), axis, 0)
@@ -481,7 +491,7 @@ class SLGBuilder(ABC):
 
         # Create wrap per object if not supplied.
         if np.isscalar(wrap):
-            wrap = (wrap * np.ones(len(objects))).astype(np.bool)
+            wrap = (wrap * np.ones(len(objects))).astype(bool)
 
         for i, obj in enumerate(objects):
 
@@ -889,7 +899,7 @@ class SLGBuilder(ABC):
 
         def prepare_sample_points(o):
             """Creates a tuple with data needed for worker."""
-            idx = self.objects.index(o)
+            idx = self.object_ids[o]
 
             points_raw = sample_points_dic.get(idx, None)
             if points_raw is None:

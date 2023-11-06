@@ -57,20 +57,21 @@ class BKBuilder(SLGBuilder):
             )
 
     def add_object(self, graph_object):
-        if graph_object in self.objects:
+        if graph_object in self.object_ids:
             # If object is already added, return its id.
-            return self.objects.index(graph_object)
+            return self.object_ids[graph_object]
 
         # Add object to graph.
         object_id = len(self.objects)
+        self.object_ids[graph_object] = object_id
 
         if self.graph is None:
-            first_id = (np.min(self.nodes[-1]) + self.objects[-1].data.size) if self.objects else 0
+            first_id = (np.min(self.nodes[self.objects[-1]]) + self.objects[-1].data.size) if self.objects else 0
         else:
             first_id = self.graph.add_node(graph_object.data.size)
 
         self.objects.append(graph_object)
-        self.nodes.append(first_id)
+        self.nodes[graph_object] = first_id
 
         return object_id
 
@@ -89,7 +90,7 @@ class BKBuilder(SLGBuilder):
             self.pairwise_e10.append(e10.ravel().astype(self.capacity_type))
             self.pairwise_e11.append(e11.ravel().astype(self.capacity_type))
         else:
-            np.vectorize(self.graph.add_edge, otypes=[np.bool])(i, j, cap, rcap)
+            np.vectorize(self.graph.add_edge, otypes=[bool])(i, j, cap, rcap)
 
     def add_unary_terms(self, i, e0, e1):
         self.add_terminal_edges(i, e1, e0)
@@ -102,7 +103,7 @@ class BKBuilder(SLGBuilder):
             self.unary_e0.append(e0.ravel().astype(self.capacity_type))
             self.unary_e1.append(e1.ravel().astype(self.capacity_type))
         else:
-            np.vectorize(self.graph.add_tweights, otypes=[np.bool])(i, source_cap, sink_cap)
+            np.vectorize(self.graph.add_tweights, otypes=[bool])(i, source_cap, sink_cap)
 
     def get_labels(self, i):
         return self.what_segments(i)
@@ -110,10 +111,10 @@ class BKBuilder(SLGBuilder):
     def what_segments(self, i):
         if isinstance(i, GraphObject):
             return self.what_segments(self.get_nodeids(i))
-        return np.vectorize(self.graph.what_segment, otypes=[np.bool])(i)
+        return np.vectorize(self.graph.what_segment, otypes=[bool])(i)
 
     def mark_nodes(self, i):
-        np.vectorize(self.graph.mark_node, otypes=[np.bool])(i)
+        np.vectorize(self.graph.mark_node, otypes=[bool])(i)
 
     def solve(self):
         self.build_graph()

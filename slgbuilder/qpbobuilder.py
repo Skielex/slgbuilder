@@ -56,20 +56,21 @@ class QPBOBuilder(SLGBuilder):
                 f"Invalid capacity type '{self.capacity_type}'. Only 'int32', 'float32' and 'float64' allowed.")
 
     def add_object(self, graph_object):
-        if graph_object in self.objects:
+        if graph_object in self.object_ids:
             # If object is already added, return its id.
-            return self.objects.index(graph_object)
+            return self.object_ids[graph_object]
 
         # Add object to graph.
         object_id = len(self.objects)
+        self.object_ids[graph_object] = object_id
 
         if self.graph is None:
-            first_id = (np.min(self.nodes[-1]) + self.objects[-1].data.size) if self.objects else 0
+            first_id = (np.min(self.nodes[self.objects[-1]]) + self.objects[-1].data.size) if self.objects else 0
         else:
             first_id = self._add_nodes(graph_object)
 
         self.objects.append(graph_object)
-        self.nodes.append(first_id)
+        self.nodes[graph_object] = first_id
 
         return object_id
 
@@ -81,7 +82,7 @@ class QPBOBuilder(SLGBuilder):
             self.unary_e0.append(e0.ravel().astype(self.capacity_type))
             self.unary_e1.append(e1.ravel().astype(self.capacity_type))
         else:
-            np.vectorize(self.graph.add_unary_term, otypes=[np.bool])(i, e0, e1)
+            np.vectorize(self.graph.add_unary_term, otypes=[bool])(i, e0, e1)
 
     def add_pairwise_terms(self, i, j, e00, e01, e10, e11):
         if self.graph is None:
@@ -94,7 +95,7 @@ class QPBOBuilder(SLGBuilder):
             self.pairwise_e10.append(e10.ravel().astype(self.capacity_type))
             self.pairwise_e11.append(e11.ravel().astype(self.capacity_type))
         else:
-            return np.vectorize(self.graph.add_pairwise_term, otypes=[np.int])(i, j, e00, e01, e10, e11)
+            return np.vectorize(self.graph.add_pairwise_term, otypes=[int])(i, j, e00, e01, e10, e11)
 
     def get_labels(self, i):
         if isinstance(i, GraphObject):

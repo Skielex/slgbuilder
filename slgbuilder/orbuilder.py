@@ -49,17 +49,18 @@ class ORBuilder(SLGBuilder):
             raise ValueError(f"Invalid capacity type '{self.capacity_type}'. Only 'integer' allowed.")
 
     def add_object(self, graph_object):
-        if graph_object in self.objects:
+        if graph_object in self.object_ids:
             # If object is already added, return its id.
-            return self.objects.index(graph_object)
+            return self.object_ids[graph_object]
 
         # Add object to graph.
         object_id = len(self.objects)
+        self.object_ids[graph_object] = object_id
 
-        first_id = (np.min(self.nodes[-1]) + self.objects[-1].data.size) if self.objects else 2
+        first_id = (np.min(self.nodes[self.objects[-1]]) + self.objects[-1].data.size) if self.objects else 2
 
         self.objects.append(graph_object)
-        self.nodes.append(first_id)
+        self.nodes[graph_object] = first_id
 
         return object_id
 
